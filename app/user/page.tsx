@@ -19,7 +19,7 @@ export default function UserPage() {
 
         <MetricCard
           title="Humidity"
-          value={72}
+          value={74}
           unit="%"
         />
 
