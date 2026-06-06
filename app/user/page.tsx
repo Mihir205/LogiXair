@@ -1,395 +1,183 @@
 "use client";
 
+import DashboardLayout from "../components/DashboardLayout";
 import {
-  Cloud,
-  CloudRain,
-  Wind,
+  CloudSun,
   Droplets,
   Thermometer,
   MapPinned,
+  Gauge,
+  Sun,
+  Mountain,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
+import useWeatherData from "../../lib/useWeatherData";
 
 export default function UserPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eef4ff] to-[#f8fbff] flex">
+  const weather = useWeatherData();
 
-      {/* SIDEBAR */}
-
-      <div className="w-[260px] bg-white border-r border-gray-200 shadow-sm flex flex-col">
-
-        {/* LOGO */}
-
-        <div className="h-24 border-b border-gray-100 flex flex-col justify-center px-6">
-          <h1 className="text-4xl font-black text-blue-600 tracking-tight">
-            LogiXair
-          </h1>
-
-          <p className="text-sm text-gray-400 mt-1">
-            Weather Intelligence Platform
-          </p>
+  // Clean, minimal inline loading state
+  if (!weather) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+        <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-xl border border-slate-200/60 shadow-sm">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium tracking-wide">Syncing data streams...</span>
         </div>
-
-        {/* MENU */}
-
-        <div className="flex flex-col gap-2 p-4">
-
-          <button className="bg-blue-100 text-blue-700 rounded-2xl px-5 py-4 text-left font-semibold shadow-sm">
-            Dashboard
-          </button>
-
-          <button className="hover:bg-gray-100 rounded-2xl px-5 py-4 text-left font-medium text-gray-700 transition">
-            Forecast
-          </button>
-
-          <button className="hover:bg-gray-100 rounded-2xl px-5 py-4 text-left font-medium text-gray-700 transition">
-            Stations
-          </button>
-
-          <button className="hover:bg-gray-100 rounded-2xl px-5 py-4 text-left font-medium text-gray-700 transition">
-            Alerts
-          </button>
-
-          <button className="hover:bg-gray-100 rounded-2xl px-5 py-4 text-left font-medium text-gray-700 transition">
-            Analytics
-          </button>
-
-          <button className="hover:bg-gray-100 rounded-2xl px-5 py-4 text-left font-medium text-gray-700 transition">
-            Map
-          </button>
-
-        </div>
-
-        {/* BOTTOM */}
-
-        <div className="mt-auto p-4">
-
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl p-5 text-white shadow-xl">
-
-            <p className="text-sm opacity-80">
-              SYSTEM STATUS
-            </p>
-
-            <h2 className="text-3xl font-black mt-2">
-              ONLINE
-            </h2>
-
-            <p className="mt-3 text-sm opacity-90">
-              All weather services are running normally.
-            </p>
-
-          </div>
-
-        </div>
-
       </div>
+    );
+  }
 
-      {/* MAIN */}
-
-      <div className="flex-1 flex flex-col">
-
-        {/* TOPBAR */}
-
-        <div className="h-24 bg-[#0c5a8f] px-10 flex items-center justify-between shadow-md">
-
+  return (
+    <DashboardLayout role="user">
+      <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
+        
+        {/* CLASSIC B2B HEADER BLOCK */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60">
           <div>
-
-            <h1 className="text-4xl font-black text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               User Dashboard
             </h1>
-
-            <p className="text-blue-100 mt-1">
-              Real-time weather intelligence & forecasting
+            <p className="text-slate-500 text-sm mt-0.5">
+              Real-time weather telemetry and field station infrastructure monitoring.
             </p>
+          </div>
+          
+          {/* Simple Network Connection Pill */}
+          <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-semibold tracking-wide text-slate-700">Station Connected</span>
+          </div>
+        </div>
 
+        {/* METRICS BENTO GRID (The single source for current weather values) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <MetricCard
+            title="Temperature"
+            value={`${weather.temperature}°C`}
+            icon={<Thermometer size={18} className="text-indigo-600" />}
+          />
+          <MetricCard
+            title="Humidity"
+            value={`${weather.humidity}%`}
+            icon={<Droplets size={18} className="text-indigo-600" />}
+          />
+          <MetricCard
+            title="Pressure"
+            value={`${weather.pressure?.toFixed(1)} hPa`}
+            icon={<Gauge size={18} className="text-indigo-600" />}
+          />
+          <MetricCard
+            title="Rain"
+            value={weather.rain ? "Detected" : "None"}
+            icon={<CloudSun size={18} className="text-indigo-600" />}
+          />
+          <MetricCard
+            title="Light Level"
+            value={`${weather.light}`}
+            icon={<Sun size={18} className="text-indigo-600" />}
+          />
+          <MetricCard
+            title="Last Updated"
+            value={
+              weather.timestamp
+                ? new Date(weather.timestamp).toLocaleTimeString()
+                : "--"
+            }
+            icon={<CheckCircle2 size={18} className="text-indigo-600" />}
+          />
+        </div>
+
+        {/* LOWER SPLIT GRID LAYOUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* HARDWARE DIAGNOSTICS TABLE (Replaces the repeated weather data metrics) */}
+          <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="pb-3 mb-4">
+                <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                  Station Hardware Diagnostics
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Physical node status reports.</p>
+              </div>
+
+              <div className="space-y-1">
+                <DiagnosticRow label="Core Microcontroller" status="Optimal" isNormal={true} />
+                <DiagnosticRow label="Barometric Sensor Array" status="Optimal" isNormal={true} />
+                <DiagnosticRow label="Thermal Core Coupling" status="Optimal" isNormal={true} />
+                <DiagnosticRow label="Photoresistor Diode" status="Optimal" isNormal={true} />
+                <DiagnosticRow label="Precipitation Switch" status="Optimal" isNormal={true} />
+                <DiagnosticRow label="Backup Battery Cell" status="94% Capacity" isNormal={true} />
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-
-            <div className="bg-white/20 backdrop-blur-md px-5 py-3 rounded-2xl text-white font-semibold">
-              Hyderabad
+          {/* GEOGRAPHIC MAP FRAME */}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col">
+            <div className="flex items-center gap-2 pb-3 mb-4">
+              <MapPinned size={16} className="text-indigo-600" />
+              <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                Station Deployment Location
+              </h2>
             </div>
 
-            <div className="bg-white text-[#0c5a8f] px-6 py-3 rounded-2xl font-bold shadow-md">
-              User
+            {/* Clean standard light-mode map layout */}
+            <div className="rounded-lg overflow-hidden border border-slate-200/60 h-[320px] bg-slate-100">
+              <iframe
+                src="https://maps.google.com/maps?q=Hyderabad&t=&z=12&ie=UTF8&iwloc=&output=embed"
+                className="w-full h-full border-0 focus:outline-none saturate-[0.85]"
+                loading="lazy"
+                title="Field Deploy Map Layout"
+              />
             </div>
-
           </div>
 
         </div>
-
-        {/* CONTENT */}
-
-        <div className="p-8 space-y-8">
-
-          {/* HERO */}
-
-          <div className="rounded-[40px] overflow-hidden shadow-2xl bg-gradient-to-r from-blue-700 via-cyan-500 to-sky-400 p-10 text-white relative">
-
-            <div className="absolute right-10 top-10 opacity-30">
-              <Cloud size={160} />
-            </div>
-
-            <p className="uppercase tracking-[4px] text-sm font-semibold opacity-80">
-              Current Weather
-            </p>
-
-            <h1 className="text-8xl font-black mt-3">
-              27°C
-            </h1>
-
-            <p className="text-2xl mt-4 font-medium">
-              Partly Cloudy • Hyderabad
-            </p>
-
-            <div className="flex gap-5 mt-10">
-
-              <div className="bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl">
-                Humidity: 65%
-              </div>
-
-              <div className="bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl">
-                Wind: 6 km/h
-              </div>
-
-              <div className="bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl">
-                Rain Chance: 20%
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* METRICS */}
-
-          <div className="grid grid-cols-4 gap-6">
-
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl p-7 shadow-md hover:shadow-2xl transition-all duration-300">
-
-              <div className="flex justify-between items-center">
-
-                <div>
-                  <p className="text-gray-400">
-                    Temperature
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    27°
-                  </h1>
-
-                  <p className="text-green-500 mt-3 font-medium">
-                    Feels pleasant
-                  </p>
-                </div>
-
-                <Thermometer className="text-red-400" size={34} />
-
-              </div>
-
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl p-7 shadow-md hover:shadow-2xl transition-all duration-300">
-
-              <div className="flex justify-between items-center">
-
-                <div>
-                  <p className="text-gray-400">
-                    Humidity
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    65%
-                  </h1>
-
-                  <p className="text-blue-500 mt-3 font-medium">
-                    Moderate moisture
-                  </p>
-                </div>
-
-                <Droplets className="text-blue-400" size={34} />
-
-              </div>
-
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl p-7 shadow-md hover:shadow-2xl transition-all duration-300">
-
-              <div className="flex justify-between items-center">
-
-                <div>
-                  <p className="text-gray-400">
-                    Wind Speed
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    6
-                  </h1>
-
-                  <p className="text-cyan-500 mt-3 font-medium">
-                    km/h breeze
-                  </p>
-                </div>
-
-                <Wind className="text-cyan-400" size={34} />
-
-              </div>
-
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl p-7 shadow-md hover:shadow-2xl transition-all duration-300">
-
-              <div className="flex justify-between items-center">
-
-                <div>
-                  <p className="text-gray-400">
-                    Rain Chance
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    20%
-                  </h1>
-
-                  <p className="text-purple-500 mt-3 font-medium">
-                    Low probability
-                  </p>
-                </div>
-
-                <CloudRain className="text-purple-400" size={34} />
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* BOTTOM SECTION */}
-
-          <div className="grid grid-cols-2 gap-8">
-
-            {/* FORECAST */}
-
-            <div className="bg-white/80 backdrop-blur-md rounded-[35px] p-8 shadow-xl">
-
-              <div className="flex justify-between items-center mb-8">
-
-                <h2 className="text-4xl font-black">
-                  5-Day Forecast
-                </h2>
-
-                <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-2xl font-semibold">
-                  Updated Live
-                </div>
-
-              </div>
-
-              <div className="space-y-5">
-
-                <div className="bg-gray-50 hover:bg-blue-50 transition rounded-3xl p-6 flex justify-between items-center">
-
-                  <div className="flex items-center gap-4">
-
-                    <Cloud className="text-yellow-500" />
-
-                    <div>
-                      <h3 className="font-bold text-xl">
-                        Monday
-                      </h3>
-
-                      <p className="text-gray-500">
-                        Partly Cloudy
-                      </p>
-                    </div>
-
-                  </div>
-
-                  <h1 className="text-3xl font-black">
-                    28°
-                  </h1>
-
-                </div>
-
-                <div className="bg-gray-50 hover:bg-blue-50 transition rounded-3xl p-6 flex justify-between items-center">
-
-                  <div className="flex items-center gap-4">
-
-                    <CloudRain className="text-blue-500" />
-
-                    <div>
-                      <h3 className="font-bold text-xl">
-                        Tuesday
-                      </h3>
-
-                      <p className="text-gray-500">
-                        Light Rain
-                      </p>
-                    </div>
-
-                  </div>
-
-                  <h1 className="text-3xl font-black">
-                    25°
-                  </h1>
-
-                </div>
-
-                <div className="bg-gray-50 hover:bg-blue-50 transition rounded-3xl p-6 flex justify-between items-center">
-
-                  <div className="flex items-center gap-4">
-
-                    <Cloud className="text-orange-500" />
-
-                    <div>
-                      <h3 className="font-bold text-xl">
-                        Wednesday
-                      </h3>
-
-                      <p className="text-gray-500">
-                        Sunny
-                      </p>
-                    </div>
-
-                  </div>
-
-                  <h1 className="text-3xl font-black">
-                    31°
-                  </h1>
-
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* MAP */}
-
-            <div className="bg-white/80 backdrop-blur-md rounded-[35px] p-8 shadow-xl">
-
-              <div className="flex justify-between items-center mb-8">
-
-                <h2 className="text-4xl font-black">
-                  Live Weather Map
-                </h2>
-
-                <MapPinned className="text-blue-500" />
-
-              </div>
-
-              <div className="rounded-[30px] overflow-hidden shadow-lg h-[500px]">
-
-                <iframe
-                  src="https://maps.google.com/maps?q=hyderabad&t=&z=5&ie=UTF8&iwloc=&output=embed"
-                  className="w-full h-full border-0"
-                />
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
       </div>
+    </DashboardLayout>
+  );
+}
 
+/* ---------- Simplified B2B Sub-components ---------- */
+
+function MetricCard({ title, value, icon }: any) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/60 p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-300 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+          {title}
+        </p>
+        <div className="p-1.5 bg-slate-50 rounded-md border border-slate-200/40">
+          {icon}
+        </div>
+      </div>
+      <h3 className="text-xl font-bold tracking-tight text-slate-900 mt-4">
+        {value}
+      </h3>
+    </div>
+  );
+}
+
+function DiagnosticRow({ label, status, isNormal }: any) {
+  return (
+    <div className="bg-slate-50/40 rounded-lg px-4 py-3 flex justify-between items-center border border-slate-100 hover:bg-slate-50 transition-colors duration-150">
+      <span className="text-xs font-medium text-slate-600">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        {isNormal ? (
+          <CheckCircle2 size={13} className="text-emerald-500" />
+        ) : (
+          <AlertTriangle size={13} className="text-amber-500" />
+        )}
+        <span className={`text-xs font-bold ${isNormal ? "text-slate-700" : "text-amber-600"}`}>
+          {status}
+        </span>
+      </div>
     </div>
   );
 }

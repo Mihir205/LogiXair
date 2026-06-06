@@ -13,7 +13,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body className="min-h-screen tracking-tight">{children}</body>
+      {/* ADD suppressHydrationWarning HERE */}
+      <body className="min-h-screen tracking-tight" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

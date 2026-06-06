@@ -1,319 +1,213 @@
 "use client";
 
+import DashboardLayout from "../components/DashboardLayout";
 import {
   Activity,
   AlertTriangle,
-  Cpu,
-  Database,
   Radio,
   ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from "lucide-react";
 
 export default function AdminPage() {
   return (
-
-    <div className="min-h-screen bg-gradient-to-br from-[#eef4ff] to-[#f8fbff] flex">
-
-      {/* SIDEBAR */}
-
-      <div className="w-[260px] bg-white border-r border-gray-200 shadow-sm flex flex-col">
-
-        <div className="h-24 border-b border-gray-100 flex flex-col justify-center px-6">
-
-          <h1 className="text-4xl font-black text-blue-600">
-            LogiXair
-          </h1>
-
-          <p className="text-sm text-gray-400 mt-1">
-            Admin Control Center
-          </p>
-
-        </div>
-
-        <div className="flex flex-col gap-2 p-4">
-
-          <button className="bg-blue-100 text-blue-700 rounded-2xl px-5 py-4 text-left font-semibold">
-            Dashboard
-          </button>
-
-          <button className="hover:bg-blue-50 hover:text-blue-600 rounded-2xl px-5 py-4 text-left font-medium transition">
-            Stations
-          </button>
-
-          <button className="hover:bg-blue-50 hover:text-blue-600 rounded-2xl px-5 py-4 text-left font-medium transition">
-            Operators
-          </button>
-
-          <button className="hover:bg-blue-50 hover:text-blue-600 rounded-2xl px-5 py-4 text-left font-medium transition">
-            Alerts
-          </button>
-
-          <button className="hover:bg-blue-50 hover:text-blue-600 rounded-2xl px-5 py-4 text-left font-medium transition">
-            Analytics
-          </button>
-
-          <button className="hover:bg-blue-50 hover:text-blue-600 rounded-2xl px-5 py-4 text-left font-medium transition">
-            Security
-          </button>
-
-        </div>
-
-      </div>
-
-      {/* MAIN */}
-
-      <div className="flex-1 flex flex-col">
-
-        {/* TOPBAR */}
-
-        <div className="h-24 bg-[#0c5a8f]/95 backdrop-blur-xl px-10 flex items-center justify-between shadow-md">
-
+    <DashboardLayout role="admin">
+      <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
+        
+        {/* CLASSIC B2B HEADER BLOCK */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60">
           <div>
-
-            <h1 className="text-4xl font-black text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Admin Dashboard
             </h1>
-
-            <p className="text-blue-100 mt-1">
-              Central monitoring & system management
+            <p className="text-slate-500 text-sm mt-0.5">
+              Central infrastructure orchestration and system hardware oversight management.
             </p>
-
           </div>
 
-          <div className="bg-white text-[#0c5a8f] px-6 py-3 rounded-2xl font-bold shadow-md">
-            Admin
+          <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-indigo-600" />
+            <span className="text-xs font-semibold tracking-wide text-slate-700">Root Infrastructure Access</span>
+          </div>
+        </div>
+
+        {/* METRICS BENTO GRID PANEL */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Total Stations"
+            value="24"
+            trend="+2 added today"
+            trendType="positive"
+            icon={<Radio size={16} className="text-slate-600" />}
+          />
+          <MetricCard
+            title="Online Nodes"
+            value="21"
+            trend="Stable network"
+            trendType="neutral"
+            icon={<Activity size={16} className="text-slate-600" />}
+          />
+          <MetricCard
+            title="Critical Alerts"
+            value="3"
+            trend="Needs attention"
+            trendType="negative"
+            icon={<AlertTriangle size={16} className="text-amber-500" />}
+          />
+          <MetricCard
+            title="System Health"
+            value="98%"
+            trend="Operational performance"
+            trendType="positive"
+            icon={<ShieldCheck size={16} className="text-slate-600" />}
+          />
+        </div>
+
+        {/* LOWER SPLIT STRUCTURAL BENTO LAYOUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* STATION NETWORK SUMMARY MODULE */}
+          <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                  Network Hardware Index
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Live status records of field nodes.</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                24 Active
+              </span>
+            </div>
+
+            <div className="space-y-2 flex-1">
+              <StationRow 
+                name="ESP32 Weather Station" 
+                location="Campus Test Site" 
+                status="ONLINE" 
+                isOnline={true} 
+              />
+              <StationRow 
+                name="Solar Node Alpha" 
+                location="Research Block" 
+                status="OFFLINE" 
+                isOnline={false} 
+              />
+            </div>
+          </div>
+
+          {/* CRITICAL ALERTS STREAM MODULE */}
+          <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col">
+            <div className="pb-3 border-b border-slate-100 mb-4">
+              <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                Infrastructure Activity Feed
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Real-time system log alerts.</p>
+            </div>
+
+            <div className="space-y-2 flex-1">
+              <LogAlertRow 
+                title="Communication failure detected" 
+                metadata="ESP32 Station • 5 mins ago" 
+                type="critical" 
+              />
+              <LogAlertRow 
+                title="Battery below threshold" 
+                metadata="Solar Node Alpha • 20 mins ago" 
+                type="warning" 
+              />
+              <LogAlertRow 
+                title="Firmware update completed" 
+                metadata="Wind Unit • 1 hour ago" 
+                type="info" 
+              />
+            </div>
           </div>
 
         </div>
-
-        {/* CONTENT */}
-
-        <div className="p-8 space-y-8">
-
-          {/* HERO */}
-
-          <div className="bg-gradient-to-r from-[#0c5a8f] to-cyan-500 rounded-[40px] p-10 text-white shadow-2xl">
-
-            <p className="uppercase tracking-[4px] text-sm opacity-80">
-              SYSTEM OVERVIEW
-            </p>
-
-            <h1 className="text-6xl font-black mt-5">
-              Weather Station Network
-            </h1>
-
-            <p className="mt-5 text-blue-100 text-lg max-w-3xl">
-              Monitor all deployed IoT weather stations, alerts,
-              operational health, analytics, and live telemetry.
-            </p>
-
-          </div>
-
-          {/* METRICS */}
-
-          <div className="grid grid-cols-4 gap-6">
-
-            <div className="bg-white rounded-[30px] p-7 shadow-md">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-gray-400">
-                    Total Stations
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    24
-                  </h1>
-
-                  <p className="text-green-500 mt-3">
-                    +2 added today
-                  </p>
-                </div>
-
-                <Radio className="text-blue-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[30px] p-7 shadow-md">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-gray-400">
-                    Online Nodes
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    21
-                  </h1>
-
-                  <p className="text-cyan-500 mt-3">
-                    Stable network
-                  </p>
-                </div>
-
-                <Activity className="text-green-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[30px] p-7 shadow-md">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-gray-400">
-                    Critical Alerts
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    3
-                  </h1>
-
-                  <p className="text-red-500 mt-3">
-                    Needs attention
-                  </p>
-                </div>
-
-                <AlertTriangle className="text-red-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[30px] p-7 shadow-md">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-gray-400">
-                    System Health
-                  </p>
-
-                  <h1 className="text-5xl font-black mt-4">
-                    98%
-                  </h1>
-
-                  <p className="text-green-500 mt-3">
-                    Excellent
-                  </p>
-                </div>
-
-                <ShieldCheck className="text-blue-500" />
-              </div>
-            </div>
-
-          </div>
-
-          {/* LOWER GRID */}
-
-          <div className="grid grid-cols-2 gap-8">
-
-            {/* STATIONS */}
-
-            <div className="bg-white rounded-[35px] p-8 shadow-xl">
-
-              <div className="flex justify-between items-center mb-8">
-
-                <h2 className="text-4xl font-black">
-                  Station Network
-                </h2>
-
-                <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-2xl font-semibold">
-                  24 Active
-                </div>
-
-              </div>
-
-              <div className="space-y-5">
-
-                <div className="border border-gray-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-
-                  <div>
-                    <h3 className="text-2xl font-bold">
-                      ESP32 Weather Station
-                    </h3>
-
-                    <p className="text-gray-500 mt-1">
-                      Campus Test Site
-                    </p>
-                  </div>
-
-                  <div className="bg-green-100 text-green-600 px-5 py-2 rounded-2xl font-bold">
-                    ONLINE
-                  </div>
-
-                </div>
-
-                <div className="border border-gray-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-
-                  <div>
-                    <h3 className="text-2xl font-bold">
-                      Solar Node Alpha
-                    </h3>
-
-                    <p className="text-gray-500 mt-1">
-                      Research Block
-                    </p>
-                  </div>
-
-                  <div className="bg-red-100 text-red-500 px-5 py-2 rounded-2xl font-bold">
-                    OFFLINE
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* ALERTS */}
-
-            <div className="bg-white rounded-[35px] p-8 shadow-xl">
-
-              <div className="flex justify-between items-center mb-8">
-
-                <h2 className="text-4xl font-black">
-                  Recent Alerts
-                </h2>
-
-                <AlertTriangle className="text-red-500" />
-
-              </div>
-
-              <div className="space-y-5">
-
-                <div className="bg-red-50 border-l-4 border-red-500 rounded-2xl p-5">
-                  <h3 className="font-bold text-xl">
-                    Communication failure detected
-                  </h3>
-
-                  <p className="text-gray-500 mt-2">
-                    ESP32 Station • 5 mins ago
-                  </p>
-                </div>
-
-                <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-2xl p-5">
-                  <h3 className="font-bold text-xl">
-                    Battery below threshold
-                  </h3>
-
-                  <p className="text-gray-500 mt-2">
-                    Solar Node Alpha • 20 mins ago
-                  </p>
-                </div>
-
-                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-2xl p-5">
-                  <h3 className="font-bold text-xl">
-                    Firmware update completed
-                  </h3>
-
-                  <p className="text-gray-500 mt-2">
-                    Wind Unit • 1 hour ago
-                  </p>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
+      </div>
+    </DashboardLayout>
+  );
+}
+
+/* ---------- Simplified B2B Sub-components ---------- */
+
+function MetricCard({ title, value, trend, trendType, icon }: any) {
+  const trendColors: any = {
+    positive: "text-emerald-600 bg-emerald-50 border-emerald-100/60",
+    negative: "text-rose-600 bg-rose-50 border-rose-100/60",
+    neutral: "text-slate-600 bg-slate-50 border-slate-200/60",
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/60 p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-300 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+          {title}
+        </p>
+        <div className="p-1.5 bg-slate-50 rounded-md border border-slate-200/40">
+          {icon}
         </div>
-
       </div>
 
+      <div className="mt-4 flex items-baseline justify-between gap-2 flex-wrap">
+        <h3 className="text-2xl font-bold tracking-tight text-slate-900">
+          {value}
+        </h3>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${trendColors[trendType] || trendColors.neutral}`}>
+          {trend}
+        </span>
+      </div>
     </div>
+  );
+}
 
+function StationRow({ name, location, status, isOnline }: any) {
+  return (
+    <div className="bg-slate-50/40 hover:bg-slate-50 rounded-lg p-4 flex justify-between items-center border border-slate-100 transition-colors duration-150">
+      <div className="space-y-0.5">
+        <h4 className="text-sm font-semibold text-slate-800">{name}</h4>
+        <p className="text-xs text-slate-400 font-medium">{location}</p>
+      </div>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${
+        isOnline 
+          ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+          : "bg-rose-50 text-rose-700 border-rose-100"
+      }`}>
+        <span className={`w-1 h-1 rounded-full ${isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
+        {status}
+      </span>
+    </div>
+  );
+}
+
+function LogAlertRow({ title, metadata, type }: any) {
+  const styles: any = {
+    critical: {
+      border: "border-l-rose-500 bg-rose-50/20",
+      icon: <XCircle size={14} className="text-rose-500 shrink-0 mt-0.5" />,
+    },
+    warning: {
+      border: "border-l-amber-500 bg-amber-50/20",
+      icon: <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />,
+    },
+    info: {
+      border: "border-l-indigo-500 bg-indigo-50/20",
+      icon: <Info size={14} className="text-indigo-600 shrink-0 mt-0.5" />,
+    },
+  };
+
+  const currentStyle = styles[type] || styles.info;
+
+  return (
+    <div className={`border border-slate-100 border-l-4 rounded-lg p-3.5 flex items-start gap-3 transition-colors duration-150 hover:bg-slate-50/30 ${currentStyle.border}`}>
+      {currentStyle.icon}
+      <div className="space-y-0.5">
+        <h4 className="text-xs font-semibold text-slate-800 leading-normal">{title}</h4>
+        <p className="text-[10px] text-slate-400 font-medium tracking-normal">{metadata}</p>
+      </div>
+    </div>
   );
 }

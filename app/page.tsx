@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -7,197 +6,208 @@ import {
   User,
   Settings,
   CloudSun,
+  Lock,
+  UserCircle,
 } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth, firestore } from "../lib/firebase";
+
+import {
+  collection,
+  getDocs,
+} from "firebase/firestore";
 
 export default function HomePage() {
-
   const router = useRouter();
-
   const [role, setRole] = useState("user");
 
-  const handleLogin = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-    if (role === "user") {
-      router.push("/user");
+  const [loading, setLoading] = useState(false);
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const snapshot = await getDocs(
+        collection(firestore, "users")
+      );
+
+      let userRole = "";
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+
+        if (data.email === email) {
+          userRole = data.role;
+        }
+      });
+
+      if (userRole === "admin") {
+        router.push("/admin");
+      }
+
+      else if (userRole === "operator") {
+        router.push("/operator");
+      }
+
+      else if (userRole === "user") {
+        router.push("/user");
+      }
+
+      else {
+        alert("Role not found in Firestore");
+      }
     }
 
-    else if (role === "operator") {
-      router.push("/operator");
+    catch (error) {
+      console.error(error);
+      alert("Invalid email or password");
     }
 
-    else if (role === "admin") {
-      router.push("/admin");
+    finally {
+      setLoading(false);
     }
-
   };
 
   return (
-
-    <div className="min-h-screen bg-gradient-to-br from-[#eef4ff] to-[#f7fbff] flex items-center justify-center p-10">
-
-      <div className="w-full max-w-6xl bg-white rounded-[40px] shadow-2xl overflow-hidden grid grid-cols-2">
-
-        {/* LEFT SIDE */}
-
-        <div className="bg-gradient-to-br from-[#0c5a8f] via-blue-600 to-cyan-500 text-white p-14 flex flex-col justify-between relative overflow-hidden">
-
-          <div className="absolute right-[-50px] top-[-50px] opacity-10">
-            <CloudSun size={300} />
-          </div>
-
-          <div>
-
-            <p className="uppercase tracking-[6px] text-sm opacity-80">
-              OFF-GRID IOT WEATHER PLATFORM
-            </p>
-
-            <h1 className="text-6xl font-black mt-6 leading-tight">
-              Weather Intelligence Platform
-            </h1>
-
-            <p className="mt-8 text-blue-100 text-lg leading-relaxed">
-              Real-time monitoring, forecasting, analytics,
-              station intelligence, alerts, and operational
-              weather insights.
-            </p>
-
-          </div>
-
-          <div className="flex gap-5">
-
-            <div className="bg-white/20 backdrop-blur-md rounded-3xl px-6 py-5">
-              Live Monitoring
-            </div>
-
-            <div className="bg-white/20 backdrop-blur-md rounded-3xl px-6 py-5">
-              Smart Forecasting
-            </div>
-
-          </div>
-
+    <div className="min-h-screen bg-white text-slate-900 grid grid-cols-1 md:grid-cols-2 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
+      
+      {/* LEFT SIDE: MINIMAL ENTERPRISE HERO */}
+      <div className="bg-slate-900 p-12 md:p-16 lg:p-24 flex flex-col justify-between relative overflow-hidden border-r border-slate-800 min-h-screen">
+        {/* Subtle background icon asset */}
+        <div className="absolute right-[-60px] top-[-60px] text-slate-800/30 pointer-events-none select-none">
+          <CloudSun size={320} className="stroke-[1.2]" />
         </div>
 
-        {/* RIGHT SIDE */}
+        <div className="my-auto relative z-10 max-w-md space-y-4">
+          <p className="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">
+            Off-Grid IoT Weather platform
+          </p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white leading-tight">
+            LogiXair Intelligence Engine
+          </h1>
+          <p className="text-slate-400 text-sm leading-relaxed font-medium">
+            Real-time monitoring, precision forecasting, historical analytics, station hardware health logs, and automated alerts.
+          </p>
+        </div>
 
-        <div className="p-16 flex flex-col justify-center">
+        <div className="relative z-10 text-[11px] font-medium text-slate-500 tracking-wide">
+          &copy; LogiXair Operations. Centralized Grid Environment.
+        </div>
+      </div>
 
-          <div>
-
-            <h2 className="text-5xl font-black text-gray-800">
+      {/* RIGHT SIDE: CLEAN ACCESS TERMINAL */}
+      <div className="flex flex-col justify-center bg-white min-h-screen px-6 py-12 sm:px-12 lg:px-20">
+        <div className="w-full max-w-sm mx-auto space-y-8">
+          
+          {/* Header */}
+          <div className="space-y-1.5 text-left">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
               Dashboard Login
             </h2>
-
-            <p className="text-gray-500 mt-4 text-lg">
-              Select your access role and continue
+            <p className="text-slate-400 text-xs font-medium">
+              Select an account role and authenticate credentials.
             </p>
-
           </div>
 
-          {/* ROLE SELECT */}
-
-          <div className="grid grid-cols-3 gap-5 mt-12">
-
-            {/* USER */}
-
+          {/* Role Grid Controls */}
+          <div className="grid grid-cols-3 gap-2">
+            {/* User */}
             <button
               onClick={() => setRole("user")}
-              className={`rounded-3xl border-2 p-6 transition-all duration-300 text-left ${
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
                 role === "user"
-                  ? "border-blue-600 bg-blue-50 shadow-lg"
-                  : "border-gray-200 hover:border-blue-300"
+                  ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
+                  : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
               }`}
             >
-
-              <User className="text-blue-600" size={34} />
-
-              <h3 className="text-2xl font-bold mt-5">
-                User
-              </h3>
-
-              <p className="text-gray-500 mt-2">
-                Weather monitoring access
-              </p>
-
+              <User className={`transition-colors ${role === "user" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 leading-none">User</h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-1 leading-none">Telemetry</p>
+              </div>
             </button>
 
-            {/* OPERATOR */}
-
+            {/* Operator */}
             <button
               onClick={() => setRole("operator")}
-              className={`rounded-3xl border-2 p-6 transition-all duration-300 text-left ${
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
                 role === "operator"
-                  ? "border-blue-600 bg-blue-50 shadow-lg"
-                  : "border-gray-200 hover:border-blue-300"
+                  ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
+                  : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
               }`}
             >
-
-              <Settings className="text-blue-600" size={34} />
-
-              <h3 className="text-2xl font-bold mt-5">
-                Operator
-              </h3>
-
-              <p className="text-gray-500 mt-2">
-                Station control access
-              </p>
-
+              <Settings className={`transition-colors ${role === "operator" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 leading-none">Operator</h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-1 leading-none">Controls</p>
+              </div>
             </button>
 
-            {/* ADMIN */}
-
+            {/* Admin */}
             <button
               onClick={() => setRole("admin")}
-              className={`rounded-3xl border-2 p-6 transition-all duration-300 text-left ${
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
                 role === "admin"
-                  ? "border-blue-600 bg-blue-50 shadow-lg"
-                  : "border-gray-200 hover:border-blue-300"
+                  ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
+                  : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
               }`}
             >
-
-              <Shield className="text-blue-600" size={34} />
-
-              <h3 className="text-2xl font-bold mt-5">
-                Admin
-              </h3>
-
-              <p className="text-gray-500 mt-2">
-                Full system management
-              </p>
-
+              <Shield className={`transition-colors ${role === "admin" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 leading-none">Admin</h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-1 leading-none">Management</p>
+              </div>
             </button>
-
           </div>
 
-          {/* LOGIN FORM */}
+          {/* Form Credentials */}
+          <div className="space-y-3">
+            <div className="relative flex items-center">
+              <UserCircle size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
+              />
+            </div>
 
-          <div className="mt-12 space-y-6">
-
-            <input
-              type="text"
-              placeholder="Username"
-              className="w-full h-16 rounded-2xl border border-gray-200 px-6 text-lg outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full h-16 rounded-2xl border border-gray-200 px-6 text-lg outline-none focus:border-blue-500"
-            />
+            <div className="relative flex items-center">
+              <Lock size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
+              />
+            </div>
 
             <button
               onClick={handleLogin}
-              className="w-full h-16 rounded-2xl bg-gradient-to-r from-[#0c5a8f] to-cyan-500 text-white text-xl font-bold shadow-xl hover:scale-[1.02] transition-all duration-300"
+              disabled={loading}
+              className="w-full h-11 rounded-lg bg-indigo-600 text-white text-xs font-bold tracking-wider uppercase border border-indigo-700 shadow-sm transition-all hover:bg-indigo-500 hover:border-indigo-600 focus:outline-none cursor-pointer active:scale-[0.99] pt-0.5"
             >
-              Open Dashboard
+              {loading ? "Signing In..." : "Open Workspace"}
             </button>
-
           </div>
 
         </div>
-
       </div>
-
+      
     </div>
-
   );
 }
