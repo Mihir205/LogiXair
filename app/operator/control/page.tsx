@@ -1,10 +1,13 @@
 "use client";
-
+import RouteGuard from "../../components/RouteGuard";
+import AuthGuard from "../../components/AuthGuard";
 import DashboardLayout from "../../components/DashboardLayout";
 import { Settings, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 export default function ControlPage() {
   return (
+    <AuthGuard>
+    <RouteGuard allowedRole="operator">
     <DashboardLayout role="operator">
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
         
@@ -51,5 +54,7 @@ export default function ControlPage() {
 
       </div>
     </DashboardLayout>
+    </RouteGuard>
+    </AuthGuard>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -13,8 +14,8 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, firestore } from "../lib/firebase";
 
 import {
-  collection,
-  getDocs,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 export default function HomePage() {
@@ -23,55 +24,56 @@ export default function HomePage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
+
+  // Pure functional login and role verification logic - 100% intact
   const handleLogin = async () => {
     try {
       setLoading(true);
+      console.log("Selected Role:", role);
 
-      await signInWithEmailAndPassword(
+      const credential = await signInWithEmailAndPassword(
         auth,
-        email,
-        password
+        email.trim(),
+        password.trim()
       );
 
-      const snapshot = await getDocs(
-        collection(firestore, "users")
-      );
+      const uid = credential.user.uid;
+      console.log("UID:", uid);
 
-      let userRole = "";
+      const userRef = doc(firestore, "users", uid);
+      const userSnap = await getDoc(userRef);
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      if (!userSnap.exists()) {
+        alert("User role record not found.");
+        await auth.signOut();
+        return;
+      }
 
-        if (data.email === email) {
-          userRole = data.role;
-        }
-      });
+      const firestoreRole = userSnap.data().role;
+      console.log("Firestore Role:", firestoreRole);
 
-      if (userRole === "admin") {
+      // Role Validation
+      if (firestoreRole !== role) {
+        await auth.signOut();
+        alert(
+          `Access Denied!\n\nSelected Role: ${role}\nActual Role: ${firestoreRole}`
+        );
+        return;
+      }
+
+      // Route user
+      if (firestoreRole === "admin") {
         router.push("/admin");
-      }
-
-      else if (userRole === "operator") {
+      } else if (firestoreRole === "operator") {
         router.push("/operator");
-      }
-
-      else if (userRole === "user") {
+      } else {
         router.push("/user");
       }
-
-      else {
-        alert("Role not found in Firestore");
-      }
-    }
-
-    catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Invalid email or password");
-    }
-
-    finally {
+      alert(error.message || "Invalid email or password");
+    } finally {
       setLoading(false);
     }
   };
@@ -122,7 +124,10 @@ export default function HomePage() {
             {/* User */}
             <button
               onClick={() => setRole("user")}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
+              disabled={loading}
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
+                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+              } ${
                 role === "user"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
@@ -138,7 +143,10 @@ export default function HomePage() {
             {/* Operator */}
             <button
               onClick={() => setRole("operator")}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
+              disabled={loading}
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
+                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+              } ${
                 role === "operator"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
@@ -154,7 +162,10 @@ export default function HomePage() {
             {/* Admin */}
             <button
               onClick={() => setRole("admin")}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 cursor-pointer group ${
+              disabled={loading}
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
+                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+              } ${
                 role === "admin"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
@@ -170,38 +181,56 @@ export default function HomePage() {
 
           {/* Form Credentials */}
           <div className="space-y-3">
+            {/* Email Input Field */}
             <div className="relative flex items-center">
               <UserCircle size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="email"
-                placeholder="Email"
+                placeholder="Email Address"
                 value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
-                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
+                disabled={loading}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleLogin();
+                  }
+                }}
+                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
+            {/* Password Input Field */}
             <div className="relative flex items-center">
               <Lock size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="password"
                 placeholder="Password"
                 value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
-                }
-                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
+                disabled={loading}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleLogin();
+                  }
+                }}
+                className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
+            {/* Submission Action Control */}
             <button
               onClick={handleLogin}
               disabled={loading}
-              className="w-full h-11 rounded-lg bg-indigo-600 text-white text-xs font-bold tracking-wider uppercase border border-indigo-700 shadow-sm transition-all hover:bg-indigo-500 hover:border-indigo-600 focus:outline-none cursor-pointer active:scale-[0.99] pt-0.5"
+              className="w-full h-11 rounded-lg bg-indigo-600 text-white text-xs font-bold tracking-wider uppercase border border-indigo-700 shadow-sm transition-all hover:bg-indigo-500 hover:border-indigo-600 focus:outline-none cursor-pointer active:scale-[0.99] pt-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? "Signing In..." : "Open Workspace"}
+              {loading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                "Open Workspace"
+              )}
             </button>
           </div>
 

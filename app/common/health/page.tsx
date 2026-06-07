@@ -2,10 +2,19 @@
 
 import DashboardLayout from "../../components/DashboardLayout";
 import { Activity, Battery, Wifi, ShieldCheck } from "lucide-react";
+import useUserRole from "../../../lib/useUserRole";
 
 export default function HealthPage() {
+  const { role, loading } = useUserRole();
+  if (loading || !role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
   return (
-    <DashboardLayout role="operator">
+    <DashboardLayout role={role}>
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
         
         {/* CLASSIC B2B HEADER BLOCK */}

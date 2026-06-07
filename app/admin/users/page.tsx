@@ -1,10 +1,13 @@
 "use client";
-
+import AuthGuard from "../../components/AuthGuard";
+import RouteGuard from "../../components/RouteGuard";
 import DashboardLayout from "../../components/DashboardLayout";
 import { Users, Plus, Shield, UserCheck, MoreHorizontal } from "lucide-react";
 
 export default function UsersPage() {
   return (
+    <AuthGuard>
+    <RouteGuard allowedRole="admin">
     <DashboardLayout role="admin">
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
         
@@ -45,6 +48,8 @@ export default function UsersPage() {
 
       </div>
     </DashboardLayout>
+    </RouteGuard>
+    </AuthGuard>
   );
 }
 

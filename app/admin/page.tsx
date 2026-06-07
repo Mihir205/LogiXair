@@ -1,6 +1,7 @@
 "use client";
-
 import DashboardLayout from "../components/DashboardLayout";
+import RouteGuard from "../components/RouteGuard";
+import AuthGuard from "../components/AuthGuard";
 import {
   Activity,
   AlertTriangle,
@@ -13,6 +14,8 @@ import {
 
 export default function AdminPage() {
   return (
+    <AuthGuard>
+    <RouteGuard allowedRole="admin">
     <DashboardLayout role="admin">
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
         
@@ -129,6 +132,8 @@ export default function AdminPage() {
         </div>
       </div>
     </DashboardLayout>
+    </RouteGuard>
+    </AuthGuard>
   );
 }
 

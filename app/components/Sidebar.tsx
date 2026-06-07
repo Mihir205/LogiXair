@@ -145,7 +145,7 @@ export default function Sidebar({ role }: SidebarProps) {
 
       {/* Navigation Links */}
       <div className="p-4 flex flex-col gap-1.5 overflow-y-auto flex-1">
-        {menus[role].map((item) => {
+        {menus[role]?.map((item) => {
           const Icon = item.icon;
 
           return (

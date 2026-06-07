@@ -1,10 +1,13 @@
 "use client";
-
+import AuthGuard from "../../components/AuthGuard";
+import RouteGuard from "../../components/RouteGuard";
 import DashboardLayout from "../../components/DashboardLayout";
 import { Radio, Plus, Layers, MapPin, Signal } from "lucide-react";
 
 export default function StationsPage() {
   return (
+    <AuthGuard>
+    <RouteGuard allowedRole="admin">
     <DashboardLayout role="admin">
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
         
@@ -44,6 +47,8 @@ export default function StationsPage() {
 
       </div>
     </DashboardLayout>
+    </RouteGuard>
+    </AuthGuard>
   );
 }
 

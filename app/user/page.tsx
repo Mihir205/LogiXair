@@ -1,5 +1,6 @@
 "use client";
-
+import RouteGuard from "../components/RouteGuard";
+import AuthGuard from "../components/AuthGuard";
 import DashboardLayout from "../components/DashboardLayout";
 import {
   CloudSun,
@@ -30,6 +31,8 @@ export default function UserPage() {
   }
 
   return (
+    <AuthGuard>
+    <RouteGuard allowedRole="user">
     <DashboardLayout role="user">
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
         
@@ -139,6 +142,8 @@ export default function UserPage() {
         </div>
       </div>
     </DashboardLayout>
+    </RouteGuard>
+    </AuthGuard>
   );
 }
 

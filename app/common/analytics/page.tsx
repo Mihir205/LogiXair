@@ -3,6 +3,8 @@
 import { useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import useAnalyticsData from "../../../lib/useAnalyticsData";
+import useUserRole from "../../../lib/useUserRole";
+
 
 import {
   LineChart,
@@ -29,7 +31,14 @@ import {
 export default function AnalyticsPage() {
   const analytics = useAnalyticsData();
   const [tab, setTab] = useState("summary");
-  
+  const { role, loading } = useUserRole();
+  if (loading || !role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading Analytics...
+      </div>
+    );
+  }
 
   // Clean, minimal loading state
   if (!analytics) {
@@ -78,7 +87,7 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <DashboardLayout role="user">
+    <DashboardLayout role={role}>
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
 
         {/* CLASSIC B2B HEADER BLOCK */}
