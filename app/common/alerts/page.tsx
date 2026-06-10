@@ -1,17 +1,27 @@
 "use client";
-
+import useAlerts from "../../../lib/useAlerts";
 import DashboardLayout from "../../components/DashboardLayout";
 import useUserRole from "../../../lib/useUserRole";
-import { 
-  Bell, 
-  XCircle, 
-  AlertTriangle, 
-  Info, 
-  Clock 
+import {
+  Bell,
+  XCircle,
+  AlertTriangle,
+  Info,
+  Clock
 } from "lucide-react";
 
 export default function AlertsPage() {
   const { role, loading } = useUserRole();
+  const alerts = useAlerts();
+
+  const activeAlerts = alerts
+    ? Object.entries(alerts).filter(
+      ([_, alert]: any) => alert.status
+    )
+    : [];
+
+  const activeCount = activeAlerts.length;
+
   if (loading || !role) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -22,7 +32,7 @@ export default function AlertsPage() {
   return (
     <DashboardLayout role={role}>
       <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
-        
+
         {/* CLASSIC B2B HEADER BLOCK */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60">
           <div>
@@ -33,16 +43,18 @@ export default function AlertsPage() {
               Real-time hardware status anomalies, threshold tracking, and communication diagnostic streams.
             </p>
           </div>
-          
+
           <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-sm">
             <Bell size={14} className="text-indigo-600" />
-            <span className="text-xs font-semibold tracking-wide text-slate-700">3 Notifications Pending</span>
+            <span className="text-xs font-semibold tracking-wide text-slate-700">
+              {activeCount} Active Alerts
+            </span>
           </div>
         </div>
 
         {/* ALERTS SYSTEM MATRIX CONTAINER */}
         <div className="bg-white p-6 rounded-xl border border-slate-200/60 shadow-sm space-y-3 transition-all duration-200 hover:border-slate-300">
-          
+
           {/* Section Sub-header Meta */}
           <div className="pb-3 border-b border-slate-100 mb-4">
             <h2 className="text-sm font-bold tracking-tight text-slate-900 leading-tight">
@@ -50,30 +62,44 @@ export default function AlertsPage() {
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 tracking-tight">Requires operational oversight and node physical validation.</p>
           </div>
+          {activeAlerts.length > 0 ? (
+            activeAlerts.map(([key, alert]: any) => (
+              <AlertRow
+                key={key}
+                title={alert.message}
+                node={`Current Value: ${alert.value}`}
+                time={new Date(
+                  alert.timestamp
+                ).toLocaleTimeString()}
+                type={
+                  key === "heavy_rain"
+                    ? "critical"
+                    : key === "high_temperature"
+                      ? "warning"
+                      : key === "low_temperature"
+                        ? "warning"
+                        : "info"
+                }
+              />
+            ))
+          ) : (
+            <div className="py-10 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 border border-emerald-100 mb-4">
+                <Bell
+                  size={24}
+                  className="text-emerald-600"
+                />
+              </div>
 
-          {/* CRITICAL INCIDENT */}
-          <AlertRow 
-            title="Communication Failure Detected" 
-            node="ESP32 Main Field Broadcaster • Node-TX-901"
-            time="5 mins ago" 
-            type="critical" 
-          />
+              <h3 className="text-lg font-semibold text-emerald-700">
+                No Active Alerts
+              </h3>
 
-          {/* WARNING INCIDENT */}
-          <AlertRow 
-            title="Battery Below Threshold" 
-            node="Solar Node Alpha • Auxiliary Pack"
-            time="20 mins ago" 
-            type="warning" 
-          />
-
-          {/* INFO INCIDENT */}
-          <AlertRow 
-            title="Rain Probability Increasing" 
-            node="Atmospheric Sensor Array • Virtual Node"
-            time="1 hour ago" 
-            type="info" 
-          />
+              <p className="text-sm text-slate-500 mt-1">
+                Weather station operating normally.
+              </p>
+            </div>
+          )}
 
         </div>
       </div>

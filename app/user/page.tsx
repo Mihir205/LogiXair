@@ -1,4 +1,6 @@
 "use client";
+
+import { useState, useEffect } from "react";
 import RouteGuard from "../components/RouteGuard";
 import AuthGuard from "../components/AuthGuard";
 import DashboardLayout from "../components/DashboardLayout";
@@ -17,6 +19,14 @@ import useWeatherData from "../../lib/useWeatherData";
 
 export default function UserPage() {
   const weather = useWeatherData();
+  const [formattedTime, setFormattedTime] = useState<string>("--");
+
+  // Fix client/server hydration mismatch for local time strings
+  useEffect(() => {
+    if (weather?.timestamp) {
+      setFormattedTime(new Date(weather.timestamp).toLocaleTimeString());
+    }
+  }, [weather?.timestamp]);
 
   // Clean, minimal inline loading state
   if (!weather) {
@@ -32,117 +42,117 @@ export default function UserPage() {
 
   return (
     <AuthGuard>
-    <RouteGuard allowedRole="user">
-    <DashboardLayout role="user">
-      <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
-        
-        {/* CLASSIC B2B HEADER BLOCK */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              User Dashboard
-            </h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              Real-time weather telemetry and field station infrastructure monitoring.
-            </p>
-          </div>
-          
-          {/* Simple Network Connection Pill */}
-          <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs font-semibold tracking-wide text-slate-700">Station Connected</span>
-          </div>
-        </div>
-
-        {/* METRICS BENTO GRID (The single source for current weather values) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <MetricCard
-            title="Temperature"
-            value={`${weather.temperature}°C`}
-            icon={<Thermometer size={18} className="text-indigo-600" />}
-          />
-          <MetricCard
-            title="Humidity"
-            value={`${weather.humidity}%`}
-            icon={<Droplets size={18} className="text-indigo-600" />}
-          />
-          <MetricCard
-            title="Pressure"
-            value={`${weather.pressure?.toFixed(1)} hPa`}
-            icon={<Gauge size={18} className="text-indigo-600" />}
-          />
-          <MetricCard
-            title="Rain"
-            value={weather.rain ? "Detected" : "None"}
-            icon={<CloudSun size={18} className="text-indigo-600" />}
-          />
-          <MetricCard
-            title="Light Level"
-            value={`${weather.light}`}
-            icon={<Sun size={18} className="text-indigo-600" />}
-          />
-          <MetricCard
-            title="Last Updated"
-            value={
-              weather.timestamp
-                ? new Date(weather.timestamp).toLocaleTimeString()
-                : "--"
-            }
-            icon={<CheckCircle2 size={18} className="text-indigo-600" />}
-          />
-        </div>
-
-        {/* LOWER SPLIT GRID LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* HARDWARE DIAGNOSTICS TABLE (Replaces the repeated weather data metrics) */}
-          <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="pb-3 mb-4">
-                <h2 className="text-sm font-bold tracking-tight text-slate-900">
-                  Station Hardware Diagnostics
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">Physical node status reports.</p>
+      <RouteGuard allowedRole="user">
+        <DashboardLayout role="user">
+          <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50">
+            
+            {/* CLASSIC B2B HEADER BLOCK */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                  User Dashboard
+                </h1>
+                <p className="text-slate-500 text-sm mt-0.5">
+                  Real-time weather telemetry and field station infrastructure monitoring.
+                </p>
               </div>
-
-              <div className="space-y-1">
-                <DiagnosticRow label="Core Microcontroller" status="Optimal" isNormal={true} />
-                <DiagnosticRow label="Barometric Sensor Array" status="Optimal" isNormal={true} />
-                <DiagnosticRow label="Thermal Core Coupling" status="Optimal" isNormal={true} />
-                <DiagnosticRow label="Photoresistor Diode" status="Optimal" isNormal={true} />
-                <DiagnosticRow label="Precipitation Switch" status="Optimal" isNormal={true} />
-                <DiagnosticRow label="Backup Battery Cell" status="94% Capacity" isNormal={true} />
+              
+              {/* Simple Network Connection Pill */}
+              <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-semibold tracking-wide text-slate-700">Station Connected</span>
               </div>
             </div>
-          </div>
 
-          {/* GEOGRAPHIC MAP FRAME */}
-          <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col">
-            <div className="flex items-center gap-2 pb-3 mb-4">
-              <MapPinned size={16} className="text-indigo-600" />
-              <h2 className="text-sm font-bold tracking-tight text-slate-900">
-                Station Deployment Location
-              </h2>
-            </div>
-
-            {/* Clean standard light-mode map layout */}
-            <div className="rounded-lg overflow-hidden border border-slate-200/60 h-[320px] bg-slate-100">
-              <iframe
-                src="https://maps.google.com/maps?q=Hyderabad&t=&z=12&ie=UTF8&iwloc=&output=embed"
-                className="w-full h-full border-0 focus:outline-none saturate-[0.85]"
-                loading="lazy"
-                title="Field Deploy Map Layout"
+            {/* METRICS BENTO GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+              <MetricCard
+                title="Temperature"
+                value={`${weather.temperature}°C`}
+                icon={<Thermometer size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Humidity"
+                value={`${weather.humidity}%`}
+                icon={<Droplets size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Pressure"
+                value={`${weather.pressure?.toFixed(1)} hPa`}
+                icon={<Gauge size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Rain"
+                value={weather.rain ? "Detected" : "None"}
+                icon={<CloudSun size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Light Level"
+                value={`${weather.light}`}
+                icon={<Sun size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Irradiance"
+                value={`${weather.irradiance}`}
+                icon={<Sun size={18} className="text-indigo-600" />}
+              />
+              <MetricCard
+                title="Last Updated"
+                value={formattedTime}
+                icon={<CheckCircle2 size={18} className="text-indigo-600" />}
               />
             </div>
-          </div>
 
-        </div>
-      </div>
-    </DashboardLayout>
-    </RouteGuard>
+            {/* LOWER SPLIT GRID LAYOUT */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* HARDWARE DIAGNOSTICS TABLE */}
+              <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="pb-3 mb-4">
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                      Station Hardware Diagnostics
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Physical node status reports.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <DiagnosticRow label="Core Microcontroller" status="Optimal" isNormal={true} />
+                    <DiagnosticRow label="Barometric Sensor Array" status="Optimal" isNormal={true} />
+                    <DiagnosticRow label="Thermal Core Coupling" status="Optimal" isNormal={true} />
+                    <DiagnosticRow label="Photoresistor Diode" status="Optimal" isNormal={true} />
+                    <DiagnosticRow label="Precipitation Switch" status="Optimal" isNormal={true} />
+                    <DiagnosticRow label="Backup Battery Cell" status="94% Capacity" isNormal={true} />
+                  </div>
+                </div>
+              </div>
+
+              {/* GEOGRAPHIC MAP FRAME */}
+              <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm flex flex-col">
+                <div className="flex items-center gap-2 pb-3 mb-4">
+                  <MapPinned size={16} className="text-indigo-600" />
+                  <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                    Station Deployment Location
+                  </h2>
+                </div>
+
+                <div className="rounded-lg overflow-hidden border border-slate-200/60 h-[320px] bg-slate-100">
+                  <iframe
+                    src="https://maps.google.com/maps?q=Hyderabad&t=&z=12&ie=UTF8&iwloc=&output=embed"
+                    className="w-full h-full border-0 focus:outline-none saturate-[0.85]"
+                    loading="lazy"
+                    title="Field Deploy Map Layout"
+                  />
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </DashboardLayout>
+      </RouteGuard>
     </AuthGuard>
   );
 }
@@ -160,7 +170,7 @@ function MetricCard({ title, value, icon }: any) {
           {icon}
         </div>
       </div>
-      <h3 className="text-xl font-bold tracking-tight text-slate-900 mt-4">
+      <h3 className="text-xl font-bold tracking-tight text-slate-900 mt-4 whitespace-nowrap">
         {value}
       </h3>
     </div>

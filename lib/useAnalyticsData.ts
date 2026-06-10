@@ -10,9 +10,19 @@ export default function useAnalyticsData() {
   useEffect(() => {
     const analyticsRef = ref(db, "analytics");
 
-    const unsubscribe = onValue(analyticsRef, (snapshot) => {
-      setAnalytics(snapshot.val());
-    });
+    const unsubscribe = onValue(
+      analyticsRef,
+      (snapshot) => {
+        const data = snapshot.val();
+
+        console.log("Analytics Loaded:", data);
+
+        setAnalytics(data);
+      },
+      (error) => {
+        console.error("Analytics Error:", error);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
