@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
-body {
-  background: #f1f5f9;
-  @apply text-slate-900 antialiased selection:bg-indigo-100;
+/* Tailwind v4 Variant Configuration */
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    background: #f1f5f9;
+    @apply text-slate-900 antialiased selection:bg-indigo-100/40 transition-colors duration-200;
+  }
+
+  /* Automatically flip background color on the body tag when .dark is active */
+  .dark body {
+    background: #0b1329; /* Deep enterprise slate background */
+    @apply text-slate-100;
+  }
 }
 
 /* Subtle scrollbar style to keep the layout feeling professional */
@@ -17,6 +28,12 @@ body {
   background: #cbd5e1;
   border-radius: 3px;
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155; /* Dark mode scrollbar */
+}
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

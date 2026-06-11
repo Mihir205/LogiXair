@@ -13,19 +13,19 @@ export default function DashboardLayout({
   role,
 }: DashboardLayoutProps) {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex overflow-hidden antialiased">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex overflow-hidden antialiased transition-colors duration-200">
 
-      {/* Sidebar */}
+      {/* Sidebar Navigation Menu Frame */}
       <Sidebar role={role} />
 
-      {/* Main Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      {/* Main Consolidated Dynamic Viewport Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
 
-        {/* Navbar */}
+        {/* Global Control Navbar */}
         <Navbar />
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Scrollable Page Viewport Element Container */}
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
           <div className="p-6 md:p-8">
             {children}
           </div>
