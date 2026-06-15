@@ -1,26 +1,17 @@
 import { NextResponse } from "next/server";
-import { adminFirestore } from "@/lib/firebaseAdmin";
+
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: "Webhook alive",
+  });
+}
 
 export async function POST(req: Request) {
-  try {
-    const data = await req.json();
+  const data = await req.json();
 
-    await adminFirestore
-      .collection("weather")
-      .add({
-        ...data,
-        timestamp: new Date(),
-      });
-
-    return NextResponse.json({
-      success: true,
-    });
-  } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      { success: false },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    success: true,
+    data,
+  });
 }
