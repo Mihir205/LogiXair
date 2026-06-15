@@ -1,6 +1,4 @@
-import { getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { adminApp } from "./firebaseAdmin";
 
-const app = getApps()[0];
-
-export const adminAuth = getAuth(app);
+export const adminAuth = getAuth(adminApp);
