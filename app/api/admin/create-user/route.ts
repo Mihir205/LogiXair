@@ -3,8 +3,12 @@
     adminAuth,
     adminFirestore,
     } from "@/lib/firebaseAdmin";
+    import { requireAdmin } from "@/lib/security/requireAdmin";
 
     export async function POST(req: Request) {
+    const guard = await requireAdmin(req);
+    if ("error" in guard) return guard.error;
+
     try {
         const body = await req.json();
 

@@ -10,6 +10,7 @@ import {
   Activity,
   Settings,
   Shield,
+  ShieldAlert,
   Users,
   Radio,
   Wrench,
@@ -114,6 +115,11 @@ export default function Sidebar({ role }: SidebarProps) {
         title: "Security",
         icon: Shield,
         href: "/admin/security",
+      },
+      {
+        title: "Cyber Demos",
+        icon: ShieldAlert,
+        href: "/admin/security-demos",
       },
       {
         title: "System Health",
