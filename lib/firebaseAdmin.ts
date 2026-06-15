@@ -1,6 +1,7 @@
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getDatabase } from "firebase-admin/database";
 
 if (!getApps().length) {
   initializeApp({
@@ -12,8 +13,11 @@ if (!getApps().length) {
         "\n"
       ),
     }),
+    databaseURL:
+      process.env.FIREBASE_DATABASE_URL,
   });
 }
 
 export const adminAuth = getAuth();
 export const adminFirestore = getFirestore();
+export const adminDatabase = getDatabase();
