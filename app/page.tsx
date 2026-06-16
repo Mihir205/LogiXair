@@ -285,7 +285,9 @@ export default function HomePage() {
                 className="w-full h-11 rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-medium text-slate-800 bg-slate-50/40 outline-none focus:border-indigo-500 focus:bg-white transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
-
+            <p className="text-red-500">
+              Selected Role: {role}
+            </p>
             {/* Submission Action Control */}
             <button
               onClick={handleLogin}
