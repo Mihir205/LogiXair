@@ -60,6 +60,15 @@ type AttackCardConfig = {
     protectionModule: string;
 };
 
+/**
+ * Cyber Demos hub policy: only attacks that REQUIRE continuous monitoring
+ * (background sentinel scanning for ongoing exploitation attempts) live
+ * here. One-shot threats whose protection is statically enforced at the
+ * code/route level — XSS sanitiser, clickjack CSP, TLS, replay guard,
+ * HMAC — are validated by toggling their constant + a single screenshot,
+ * not by a Run Attack button. Adding them here would burn Firestore
+ * quota for no extra security value.
+ */
 const ATTACKS: AttackCardConfig[] = [
     {
         id: "01",
@@ -69,9 +78,22 @@ const ATTACKS: AttackCardConfig[] = [
         overview:
             "POST /api/admin/create-user accepted anonymous requests. A single curl " +
             "could mint a new Firebase Auth admin account — the request body's " +
-            "role field was trusted verbatim. Successful exploits are auto-cleaned " +
-            "(rogue user removed) and logged to the security_events feed.",
-        protectionModule: "lib/security/requireAdmin.ts",
+            "role field was trusted verbatim. The Sentinel scans every 30s and " +
+            "auto-deletes any rogue admin created bypassing this guard.",
+        protectionModule: "lib/security/requireAdmin.ts + Sentinel",
+    },
+    {
+        id: "09",
+        title: "Rogue Node Join",
+        column: "LoRa · Device Registry",
+        severity: "high",
+        overview:
+            "Attacker provisions a brand-new LoRa node with a self-chosen " +
+            "device_id and starts publishing telemetry. Without an explicit " +
+            "allow-list every fabricated reading is persisted as if it came " +
+            "from a real station. Continuously monitored — rogue device_ids " +
+            "can appear at any moment, so the guard re-runs on every ingest.",
+        protectionModule: "lib/security/deviceRegistry.ts",
     },
 ];
 
@@ -291,10 +313,13 @@ function SentinelStatus() {
     const { report, error, busy } = useSecuritySentinel(30_000);
 
     const lastDeletions = report?.deleted ?? [];
+    const rogueNodes = report?.rogueNodeAttempts ?? [];
+    const jamming = report?.jammingSuspects ?? [];
+    const anyActivity = lastDeletions.length > 0 || rogueNodes.length > 0 || jamming.length > 0;
     const tone =
         error
             ? "border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
-            : lastDeletions.length > 0
+            : anyActivity
                 ? "border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300"
                 : "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300";
 
@@ -316,24 +341,67 @@ function SentinelStatus() {
             ) : report == null ? (
                 <p className="text-xs">Connecting…</p>
             ) : (
-                <div className="text-xs space-y-1.5">
+                <div className="text-xs space-y-2">
                     <p>
                         Last sweep at {report.runAt.toLocaleTimeString()} — scanned{" "}
-                        <strong>{report.scannedUsers}</strong> users in{" "}
-                        <strong>{report.durationMs} ms</strong>.{" "}
-                        {lastDeletions.length === 0
-                            ? "No rogue accounts found."
-                            : `Auto-quarantined ${lastDeletions.length} suspicious account${lastDeletions.length === 1 ? "" : "s"}:`}
+                        <strong>{report.scannedUsers}</strong> users +{" "}
+                        <strong>{rogueNodes.length}</strong> rogue LoRa attempts (last{" "}
+                        {Math.floor((report.rogueNodeWindowSec ?? 300) / 60)} min) in{" "}
+                        <strong>{report.durationMs} ms</strong>.
                     </p>
+
                     {lastDeletions.length > 0 && (
-                        <ul className="font-mono space-y-1 mt-2">
-                            {lastDeletions.map((d) => (
-                                <li key={d.uid}>
-                                    🗑️ {d.email} — {d.reason}
-                                </li>
-                            ))}
-                        </ul>
+                        <div>
+                            <p className="font-bold">Quarantined accounts:</p>
+                            <ul className="font-mono space-y-1 mt-1">
+                                {lastDeletions.map((d) => (
+                                    <li key={d.uid}>🗑️ {d.email} — {d.reason}</li>
+                                ))}
+                            </ul>
+                        </div>
                     )}
+
+                    {rogueNodes.length > 0 && (
+                        <div>
+                            <p className="font-bold">Rogue LoRa devices blocked:</p>
+                            <ul className="font-mono space-y-1 mt-1">
+                                {rogueNodes.slice(0, 5).map((n, i) => (
+                                    <li key={`${n.device_id}-${n.blockedAt}-${i}`}>
+                                        📡 <strong>{n.device_id}</strong> — {n.reason}{" "}
+                                        <span className="opacity-70">
+                                            at {new Date(n.blockedAt).toLocaleTimeString()}
+                                        </span>
+                                    </li>
+                                ))}
+                                {rogueNodes.length > 5 && (
+                                    <li className="opacity-70">…and {rogueNodes.length - 5} more</li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+
+                    {jamming.length > 0 && (
+                        <div>
+                            <p className="font-bold">
+                                Possible jamming / link loss (silent &gt;{" "}
+                                {report.jammingThresholdSec ?? 30}s):
+                            </p>
+                            <ul className="font-mono space-y-1 mt-1">
+                                {jamming.slice(0, 5).map((j) => (
+                                    <li key={j.device_id}>
+                                        📵 <strong>{j.device_id}</strong> — silent{" "}
+                                        {j.silent_for_sec}s, last seen{" "}
+                                        {new Date(j.last_seen_iso).toLocaleTimeString()}
+                                    </li>
+                                ))}
+                                {jamming.length > 5 && (
+                                    <li className="opacity-70">…and {jamming.length - 5} more</li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+
+                    {!anyActivity && <p className="opacity-80">No rogue activity detected.</p>}
                 </div>
             )}
         </div>

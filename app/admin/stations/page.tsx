@@ -12,6 +12,7 @@ import {
   Signal,
   X,
   Cpu,
+  Trash2,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
@@ -20,8 +21,14 @@ import {
   addDoc,
   getDocs,
   serverTimestamp,
+  doc,
+  deleteDoc,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
+import {
+  XSS_DEMO_VULNERABLE,
+  validateStationName,
+} from "@/lib/sanitize";
 
 type Station = {
   id: string;
@@ -56,10 +63,40 @@ export default function StationsPage() {
     fetchStations();
   }, []);
 
+  const deleteStation = async (id: string) => {
+    if (!confirm("Delete this station permanently?")) return;
+    try {
+      await deleteDoc(doc(firestore, "stations", id));
+      fetchStations();
+    } catch (e) {
+      console.error("Error deleting station:", e);
+    }
+  };
+
+  const [validationError, setValidationError] = useState("");
+
   const createStation = async () => {
+    setValidationError("");
     if (!stationName.trim() || !location.trim()) {
-      alert("Please fill all fields");
+      setValidationError("Please fill all fields.");
       return;
+    }
+
+    // Server-side equivalent input validation (only enforced when XSS
+    // protection is enabled — when the demo flag is on, we deliberately
+    // let the malicious payload reach Firestore so the vulnerable render
+    // path can demonstrate the attack).
+    if (!XSS_DEMO_VULNERABLE) {
+      const v1 = validateStationName(stationName);
+      if (!v1.ok) {
+        setValidationError(`Station name rejected: ${v1.reason}`);
+        return;
+      }
+      const v2 = validateStationName(location);
+      if (!v2.ok) {
+        setValidationError(`Location rejected: ${v2.reason}`);
+        return;
+      }
     }
 
     try {
@@ -76,7 +113,7 @@ export default function StationsPage() {
       fetchStations();
     } catch (error) {
       console.error("Error creating station:", error);
-      alert("Failed to create station");
+      setValidationError("Failed to create station.");
     }
   };
 
@@ -85,6 +122,19 @@ export default function StationsPage() {
       <RouteGuard allowedRole="admin">
         <DashboardLayout role="admin">
           <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-600/10 selection:text-indigo-700 transition-colors duration-200">
+
+            {/* XSS DEMO MODE BANNER (lib/sanitize.ts -> XSS_DEMO_VULNERABLE) */}
+            <div
+              className={`rounded-lg border px-3 py-2 text-[11px] font-bold tracking-wider uppercase ${
+                XSS_DEMO_VULNERABLE
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
+              }`}
+            >
+              {XSS_DEMO_VULNERABLE
+                ? "XSS Protection: OFF  ·  station names rendered via dangerouslySetInnerHTML  ·  no input validation"
+                : "XSS Protection: ON  ·  CSP enforced  ·  station names escaped  ·  input validated"}
+            </div>
 
             {/* CLASSIC B2B HEADER BLOCK */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
@@ -132,6 +182,7 @@ export default function StationsPage() {
                       identity={station.name}
                       regionalMeta={station.location}
                       nodeState={station.status}
+                      onDelete={() => deleteStation(station.id)}
                     />
                   ))
                 )}
@@ -160,7 +211,13 @@ export default function StationsPage() {
 
                 {/* Form fields layout container */}
                 <div className="p-6 space-y-4">
-                  
+
+                  {validationError && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-medium px-3 py-2.5">
+                      {validationError}
+                    </div>
+                  )}
+
                   {/* Station name wrapper */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Station Asset Identifier</label>
@@ -223,10 +280,12 @@ function StationListItem({
   identity,
   regionalMeta,
   nodeState,
+  onDelete,
 }: {
   identity: string;
   regionalMeta: string;
   nodeState: string;
+  onDelete?: () => void;
 }) {
   const isOnline = nodeState?.toLowerCase() === "online";
 
@@ -238,13 +297,27 @@ function StationListItem({
         </div>
 
         <div className="space-y-0.5">
-          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">
-            {identity}
-          </h4>
+          {/* XSS attack surface: station name comes from Firestore.            */}
+          {/* VULNERABLE path uses dangerouslySetInnerHTML -> payload fires.    */}
+          {/* SAFE path uses JSX child -> React auto-escapes.                   */}
+          {XSS_DEMO_VULNERABLE ? (
+            <h4
+              className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight"
+              dangerouslySetInnerHTML={{ __html: identity }}
+            />
+          ) : (
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+              {identity}
+            </h4>
+          )}
 
           <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs font-medium mt-0.5">
             <MapPin size={12} className="text-slate-300 dark:text-slate-600 shrink-0" />
-            <span>{regionalMeta}</span>
+            {XSS_DEMO_VULNERABLE ? (
+              <span dangerouslySetInnerHTML={{ __html: regionalMeta }} />
+            ) : (
+              <span>{regionalMeta}</span>
+            )}
           </div>
         </div>
       </div>
@@ -258,6 +331,15 @@ function StationListItem({
           <Signal size={10} className={isOnline ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"} />
           {nodeState}
         </span>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            title="Delete station"
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-200 dark:hover:border-rose-900/60 transition-all cursor-pointer"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     </div>
   );

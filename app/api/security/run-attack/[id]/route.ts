@@ -153,11 +153,85 @@ async function attack01_createAdmin(
     };
 }
 
+async function attack09_rogueNodeJoin(
+    runByUid: string,
+    runByEmail: string | undefined,
+): Promise<AttackResult> {
+    const start = Date.now();
+    const target = `${ORIGIN}/api/sensors/ingest`;
+    const tag = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const body = {
+        device_id: `ROGUE-NODE-${tag}`,
+        timestamp: Math.floor(Date.now() / 1000),
+        nonce: Math.floor(Math.random() * 1e9),
+        temperature: 999, humidity: 999, rainfall: 999,
+    };
+
+    let httpStatus = 0; let responseBody: unknown = null;
+    try {
+        const res = await fetch(target, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        httpStatus = res.status;
+        const text = await res.text();
+        try { responseBody = JSON.parse(text); } catch { responseBody = text; }
+    } catch (e) {
+        responseBody = { error: e instanceof Error ? e.message : "fetch failed" };
+    }
+
+    const exploited = httpStatus === 200 &&
+        responseBody !== null && typeof responseBody === "object" &&
+        (responseBody as { success?: boolean }).success === true;
+    const blocked = httpStatus === 403;
+
+    const eventId = await logSecurityEvent({
+        type: exploited ? "rogue_node_accepted"
+            : blocked ? "rogue_node_blocked"
+            : "demo_runtime_error",
+        severity: exploited ? "critical" : blocked ? "info" : "high",
+        source: "demo_attack",
+        summary: exploited
+            ? `Attack 09 exploited — unregistered device ${body.device_id} was accepted.`
+            : blocked
+                ? `Attack 09 blocked — device registry rejected ${body.device_id}.`
+                : `Attack 09 errored — see HTTP status ${httpStatus}.`,
+        target: { route: "/api/sensors/ingest", device_id: body.device_id },
+        triggeredBy: { uid: runByUid, email: runByEmail, mode: "demo-button" },
+        cleanedUp: false,
+    });
+
+    return {
+        id: "09",
+        name: "Rogue Node Join",
+        description:
+            "Attacker provisions an unregistered LoRa node and tries to " +
+            "publish telemetry under a self-chosen device_id. Without an " +
+            "explicit allow-list, the backend persists fake readings from " +
+            "phantom devices and corrupts the dataset.",
+        target,
+        method: "POST",
+        requestBody: body,
+        httpStatus,
+        responseBody,
+        classification: exploited ? "exploited" : blocked ? "blocked" : "error",
+        summary: exploited
+            ? "EXPLOITED — unregistered device was accepted as if it were a real station."
+            : blocked
+                ? "BLOCKED — device registry refused the unknown device_id."
+                : "ERROR — ingest endpoint did not respond as expected.",
+        durationMs: Date.now() - start,
+        eventId,
+    };
+}
+
 const REGISTRY: Record<
     string,
     (uid: string, email: string | undefined) => Promise<AttackResult>
 > = {
     "01": attack01_createAdmin,
+    "09": attack09_rogueNodeJoin,
 };
 
 export async function POST(

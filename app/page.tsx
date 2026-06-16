@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Shield,
@@ -9,6 +9,7 @@ import {
   CloudSun,
   Lock,
   UserCircle,
+  AlertCircle,
 } from "lucide-react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, firestore } from "../lib/firebase";
@@ -18,6 +19,14 @@ import {
   getDoc,
 } from "firebase/firestore";
 
+import {
+  readLockout,
+  recordFailure,
+  resetLockout,
+  formatRemaining,
+  MAX_ATTEMPTS,
+} from "../lib/lockout";
+
 export default function HomePage() {
   const router = useRouter();
   const [role, setRole] = useState("user");
@@ -26,53 +35,91 @@ export default function HomePage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Pure functional login and role verification logic - 100% intact
+  // Brute-force lockout banner state
+  const [errorMsg, setErrorMsg] = useState("");
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+
+  // Live 15-min countdown timer
+  useEffect(() => {
+    if (lockSecondsLeft <= 0) return;
+    const t = setInterval(() => setLockSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [lockSecondsLeft]);
+
+  // Login + lockout enforcement (mirrors FastAPI /auth/login behaviour:
+  // 5 wrong attempts -> 15 min lock, auto-unlock when timer expires).
   const handleLogin = async () => {
+    setErrorMsg("");
+    if (!email || !password) {
+      setErrorMsg("Enter email and password.");
+      return;
+    }
+    setLoading(true);
     try {
-      setLoading(true);
-      console.log("Selected Role:", role);
-
-      const credential = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password.trim()
-      );
-
-      const uid = credential.user.uid;
-      console.log("UID:", uid);
-
-      const userRef = doc(firestore, "users", uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        alert("User role record not found.");
-        await auth.signOut();
-        return;
-      }
-
-      const firestoreRole = userSnap.data().role;
-      console.log("Firestore Role:", firestoreRole);
-
-      // Role Validation
-      if (firestoreRole !== role) {
-        await auth.signOut();
-        alert(
-          `Access Denied!\n\nSelected Role: ${role}\nActual Role: ${firestoreRole}`
+      // Pre-flight: refuse to even contact Firebase if account is locked.
+      const pre = await readLockout(email);
+      if (pre.is_locked) {
+        setLockSecondsLeft(pre.lock_seconds_remaining);
+        setAttemptsRemaining(0);
+        setErrorMsg(
+          `Account locked. Auto-unlocks in ${formatRemaining(pre.lock_seconds_remaining)}.`
         );
         return;
       }
 
-      // Route user
-      if (firestoreRole === "admin") {
-        router.push("/admin");
-      } else if (firestoreRole === "operator") {
-        router.push("/operator");
-      } else {
-        router.push("/user");
+      try {
+        const credential = await signInWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password.trim()
+        );
+
+        const uid = credential.user.uid;
+
+        const userRef = doc(firestore, "users", uid);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          await auth.signOut();
+          setErrorMsg("User role record not found. Contact administrator.");
+          return;
+        }
+
+        const firestoreRole = userSnap.data().role;
+
+        if (firestoreRole !== role) {
+          await auth.signOut();
+          setErrorMsg(
+            `Access denied. Selected role "${role}" does not match account role "${firestoreRole}".`
+          );
+          return;
+        }
+
+        // Successful login -> reset failed-attempt counter.
+        await resetLockout(email);
+
+        if (firestoreRole === "admin") router.push("/admin");
+        else if (firestoreRole === "operator") router.push("/operator");
+        else router.push("/user");
+      } catch (authErr: any) {
+        // Wrong password / unknown user -> log a failed attempt.
+        const status = await recordFailure(email);
+        setAttemptsRemaining(status.attempts_remaining);
+        if (status.is_locked) {
+          setLockSecondsLeft(status.lock_seconds_remaining);
+          setErrorMsg(
+            `Too many failed attempts. Account locked for 15 min. Auto-unlocks in ${formatRemaining(status.lock_seconds_remaining)}.`
+          );
+        } else {
+          setErrorMsg(
+            `Invalid credentials — ${status.attempts_remaining} of ${MAX_ATTEMPTS} attempt${status.attempts_remaining === 1 ? "" : "s"} remaining.`
+          );
+        }
       }
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || "Invalid email or password");
+    } catch (outer: any) {
+      console.error(outer);
+      setErrorMsg(outer?.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -179,6 +226,34 @@ export default function HomePage() {
             </button>
           </div>
 
+          {/* Brute-force / lockout banner */}
+          {(errorMsg || lockSecondsLeft > 0) && (
+            <div
+              className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium ${
+                lockSecondsLeft > 0
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : attemptsRemaining !== null && attemptsRemaining <= 2
+                  ? "bg-amber-50 border-amber-200 text-amber-800"
+                  : "bg-rose-50 border-rose-200 text-rose-700"
+              }`}
+              data-testid="lockout-banner"
+            >
+              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+              <div className="space-y-0.5">
+                <p>
+                  {lockSecondsLeft > 0
+                    ? `Account locked. Auto-unlocks in ${formatRemaining(lockSecondsLeft)}.`
+                    : errorMsg}
+                </p>
+                {lockSecondsLeft === 0 && attemptsRemaining !== null && attemptsRemaining > 0 && (
+                  <p className="text-[10px] opacity-80">
+                    {attemptsRemaining} of {MAX_ATTEMPTS} attempts remaining before 15 min lockout.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Form Credentials */}
           <div className="space-y-3">
             {/* Email Input Field */}
@@ -220,7 +295,7 @@ export default function HomePage() {
             {/* Submission Action Control */}
             <button
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || lockSecondsLeft > 0}
               className="w-full h-11 rounded-lg bg-indigo-600 text-white text-xs font-bold tracking-wider uppercase border border-indigo-700 shadow-sm transition-all hover:bg-indigo-500 hover:border-indigo-600 focus:outline-none cursor-pointer active:scale-[0.99] pt-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -228,6 +303,8 @@ export default function HomePage() {
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Authenticating...</span>
                 </>
+              ) : lockSecondsLeft > 0 ? (
+                `Locked — ${formatRemaining(lockSecondsLeft)}`
               ) : (
                 "Open Workspace"
               )}
