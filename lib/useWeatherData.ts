@@ -10,12 +10,25 @@ export default function useWeatherData() {
   useEffect(() => {
     const weatherRef = ref(db, "weather_station");
 
-    const unsubscribe = onValue(
-      weatherRef,
-      (snapshot) => {
-        setWeather(snapshot.val());
-      }
-    );
+    const unsubscribe = onValue(weatherRef, (snapshot) => {
+      const data = snapshot.val();
+
+      if (!data?.payload) return;
+
+      setWeather({
+        temperature: data.payload.temperature,
+        humidity: data.payload.humidity,
+        pressure: data.payload.pressure,
+        rain: data.payload.rain,
+        light: data.payload.light,
+        irradiance: data.payload.irradiance,
+        wind_direction: data.payload.wind_direction,
+        station_id: data.payload.station_id,
+        timestamp: data.payload.timestamp,
+        receivedAt: data.receivedAt,
+        topic: data.topic,
+      });
+    });
 
     return () => unsubscribe();
   }, []);

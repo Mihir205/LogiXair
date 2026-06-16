@@ -18,12 +18,28 @@ import useWeatherData from "../../lib/useWeatherData";
 
 export default function UserPage() {
   const weather = useWeatherData();
-  const [formattedTime, setFormattedTime] = useState<string>("--");
+  const [formattedDate, setFormattedDate] = useState("--");
+  const [formattedTime, setFormattedTime] = useState("--");
 
-  // Fix client/server hydration mismatch for local time strings
   useEffect(() => {
     if (weather?.timestamp) {
-      setFormattedTime(new Date(weather.timestamp).toLocaleTimeString());
+      const date = new Date(weather.timestamp);
+
+      setFormattedDate(
+        date.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      );
+
+      setFormattedTime(
+        date.toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      );
     }
   }, [weather?.timestamp]);
 
@@ -44,7 +60,7 @@ export default function UserPage() {
       <RouteGuard allowedRole="user">
         <DashboardLayout role="user">
           <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-            
+
             {/* CLASSIC B2B HEADER BLOCK */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
               <div>
@@ -55,7 +71,7 @@ export default function UserPage() {
                   Real-time weather telemetry and field station infrastructure monitoring.
                 </p>
               </div>
-              
+
               {/* Simple Network Connection Pill */}
               <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors duration-200">
                 <span className="relative flex h-2 w-2">
@@ -98,16 +114,35 @@ export default function UserPage() {
                 value={`${weather.irradiance}`}
                 icon={<Sun size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
-              <MetricCard
-                title="Last Updated"
-                value={formattedTime}
-                icon={<CheckCircle2 size={18} className="text-indigo-600 dark:text-indigo-400" />}
-              />
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                    Last Updated
+                  </p>
+
+                  <div className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200/40 dark:border-slate-700/60">
+                    <CheckCircle2
+                      size={18}
+                      className="text-indigo-600 dark:text-indigo-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                    {formattedTime}
+                  </p>
+
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide">
+                    {formattedDate}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* LOWER SPLIT GRID LAYOUT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
+
               {/* HARDWARE DIAGNOSTICS TABLE */}
               <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm flex flex-col justify-between transition-colors duration-200">
                 <div>
