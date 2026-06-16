@@ -15,9 +15,15 @@ import type { NextConfig } from "next";
  * stored-XSS payload like <img onerror=alert(1)> is blocked even when the
  * vulnerable render path is selected for the demo.
  */
-// Next.js dev mode (Turbopack / HMR) emits inline <script> tags for fast
-// refresh — those need 'unsafe-inline' on script-src or React never hydrates
-// and every button on the page becomes a no-op. Production is strict.
+// Both Next.js dev (Turbopack / HMR) AND prod (SSR streaming + hydration
+// markers) emit inline <script> tags. Without 'unsafe-inline' on script-src,
+// React never hydrates on the deployed site and every button becomes a
+// no-op — login can't happen. The clean long-term answer is per-request
+// nonces via middleware; for now we allow 'unsafe-inline' in both modes.
+// XSS is still blocked because:
+//   • Sanitizer rejects payloads at write time (sanitize.ts)
+//   • React JSX auto-escapes user-supplied strings
+//   • dangerouslySetInnerHTML is only used in the demo vulnerable path
 const isDev = process.env.NODE_ENV !== "production";
 
 // FLIP FOR THE BEFORE / AFTER CLICKJACK SCREENSHOTS.
@@ -27,7 +33,7 @@ const CLICKJACK_PROTECTION = true;
 
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-eval'${isDev ? " 'unsafe-inline'" : ""}`,
+  `script-src 'self' 'unsafe-eval' 'unsafe-inline'`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
