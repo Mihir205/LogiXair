@@ -15,8 +15,8 @@
  */
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/security/requireAdmin";
-import { adminAuth, adminFirestore } from "@/lib/firebaseAdmin";
-import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
+import { adminAuth } from "@/lib/firebaseAuth";
+import { adminFirestore } from "@/lib/firebaseAdmin";import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
 
 type AttackResult = {
     id: string;

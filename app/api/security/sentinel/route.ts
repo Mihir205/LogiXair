@@ -12,7 +12,8 @@
  */
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/security/requireAdmin";
-import { adminAuth, adminFirestore } from "@/lib/firebaseAdmin";
+import { adminAuth } from "@/lib/firebaseAuth";
+import { adminFirestore } from "@/lib/firebaseAdmin";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
 
 const ROGUE_EMAIL = /^hacker_.*@evil\.com$/i;
