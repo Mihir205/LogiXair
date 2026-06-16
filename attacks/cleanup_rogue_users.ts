@@ -39,7 +39,11 @@ const PATTERN = /^hacker_.*@evil\.com$/i;
 
 // ── 2. Dynamically import the admin SDK now that env is populated ──
 async function main() {
-    const { adminAuth, adminFirestore } = await import("../lib/firebaseAdmin");
+    const { adminFirestore } =
+        await import("../lib/firebaseAdmin");
+
+    const { adminAuth } =
+        await import("../lib/firebaseAuth");
 
     console.log("Scanning Firebase Auth for rogue users…");
     let nextPageToken: string | undefined = undefined;
