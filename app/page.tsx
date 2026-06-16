@@ -87,7 +87,6 @@ export default function HomePage() {
         }
 
         const firestoreRole = userSnap.data().role;
-
         if (firestoreRole !== role) {
           await auth.signOut();
           setErrorMsg(
@@ -95,13 +94,15 @@ export default function HomePage() {
           );
           return;
         }
-
         // Successful login -> reset failed-attempt counter.
         await resetLockout(email);
-
-        if (firestoreRole === "admin") router.push("/admin");
-        else if (firestoreRole === "operator") router.push("/operator");
-        else router.push("/user");
+        if (firestoreRole === "admin") {
+          router.push("/admin");
+        } else if (firestoreRole === "operator") {
+          router.push("/operator");
+        } else {
+          router.push("/user");
+        }
       } catch (authErr: any) {
         // Wrong password / unknown user -> log a failed attempt.
         const status = await recordFailure(email);
@@ -127,7 +128,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 grid grid-cols-1 md:grid-cols-2 antialiased selection:bg-indigo-600/10 selection:text-indigo-700">
-      
+
       {/* LEFT SIDE: MINIMAL ENTERPRISE HERO */}
       <div className="bg-slate-900 p-12 md:p-16 lg:p-24 flex flex-col justify-between relative overflow-hidden border-r border-slate-800 min-h-screen">
         {/* Subtle background icon asset */}
@@ -155,7 +156,7 @@ export default function HomePage() {
       {/* RIGHT SIDE: CLEAN ACCESS TERMINAL */}
       <div className="flex flex-col justify-center bg-white min-h-screen px-6 py-12 sm:px-12 lg:px-20">
         <div className="w-full max-w-sm mx-auto space-y-8">
-          
+
           {/* Header */}
           <div className="space-y-1.5 text-left">
             <h2 className="text-xl font-bold tracking-tight text-slate-900">
@@ -172,13 +173,11 @@ export default function HomePage() {
             <button
               onClick={() => setRole("user")}
               disabled={loading}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
-                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                role === "user"
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                } ${role === "user"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
-              }`}
+                }`}
             >
               <User className={`transition-colors ${role === "user" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
               <div>
@@ -191,13 +190,11 @@ export default function HomePage() {
             <button
               onClick={() => setRole("operator")}
               disabled={loading}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
-                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                role === "operator"
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                } ${role === "operator"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
-              }`}
+                }`}
             >
               <Settings className={`transition-colors ${role === "operator" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
               <div>
@@ -210,13 +207,11 @@ export default function HomePage() {
             <button
               onClick={() => setRole("admin")}
               disabled={loading}
-              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${
-                loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                role === "admin"
+              className={`rounded-lg border p-3.5 transition-all duration-150 text-left flex flex-col justify-between h-24 group ${loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                } ${role === "admin"
                   ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600/30"
                   : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
-              }`}
+                }`}
             >
               <Shield className={`transition-colors ${role === "admin" ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`} size={16} />
               <div>
@@ -229,13 +224,12 @@ export default function HomePage() {
           {/* Brute-force / lockout banner */}
           {(errorMsg || lockSecondsLeft > 0) && (
             <div
-              className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium ${
-                lockSecondsLeft > 0
-                  ? "bg-rose-50 border-rose-200 text-rose-700"
-                  : attemptsRemaining !== null && attemptsRemaining <= 2
+              className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium ${lockSecondsLeft > 0
+                ? "bg-rose-50 border-rose-200 text-rose-700"
+                : attemptsRemaining !== null && attemptsRemaining <= 2
                   ? "bg-amber-50 border-amber-200 text-amber-800"
                   : "bg-rose-50 border-rose-200 text-rose-700"
-              }`}
+                }`}
               data-testid="lockout-banner"
             >
               <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
@@ -313,7 +307,7 @@ export default function HomePage() {
 
         </div>
       </div>
-      
+
     </div>
   );
 }

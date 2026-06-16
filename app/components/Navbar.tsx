@@ -11,15 +11,6 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Prevents hydration UI mismatches on the toggle icon
-  const [isHttps, setIsHttps] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-    if (typeof window !== "undefined") {
-      setIsHttps(window.location.protocol === "https:");
-    }
-  }, []);
-
   const handleLogout = () => {
     try {
       router.push("/");
@@ -40,21 +31,6 @@ export default function Navbar() {
 
       {/* RIGHT AREA */}
       <div className="flex items-center gap-5">
-
-        {/* TLS / MITM-protection badge — driven by window.location.protocol */}
-        {mounted && (
-          <span
-            title={isHttps ? "Transport: TLS 1.3 (HTTPS)" : "Transport: PLAINTEXT (HTTP) — vulnerable to MITM"}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase border ${
-              isHttps
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40"
-                : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40"
-            }`}
-          >
-            {isHttps ? <Lock size={11} /> : <ShieldOff size={11} />}
-            {isHttps ? "TLS Secured" : "Plain HTTP"}
-          </span>
-        )}
 
         {/* THEME TOGGLE BUTTON */}
         <button
