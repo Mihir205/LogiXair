@@ -17,12 +17,25 @@ service cloud.firestore {
 
     // ── users ───────────────────────────────────────────────────────
     // The login page reads users/{uid} to learn the caller's role, so
-    // we keep that readable for any authenticated user (their own doc).
+    // we keep single-doc reads available for the signed-in owner. What
+    // we DO NOT allow is enumeration of the collection or reading other
+    // users' docs from the client — that would leak every email + role
+    // pair to anyone with a logged-in browser, enabling targeted phishing
+    // and password-reset abuse against admins.
+    //
     // Writes are allowed as before EXCEPT no one (including the user
     // themselves) may flip their own role field. Backend admin SDK
     // operations bypass these rules.
     match /users/{uid} {
-      allow read: if request.auth != null;
+      // Single-doc read: owner-or-admin only. Anonymous enumeration of
+      // other users' emails is the email-exposure attack — blocked here.
+      allow get: if request.auth != null &&
+        ( request.auth.uid == uid ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" );
+
+      // Collection listing: admin only. Closes the email-harvest vector.
+      allow list: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
       // On update: anyone signed-in can update their own doc but
       // CANNOT change the role field. This is the protection for the

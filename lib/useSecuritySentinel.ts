@@ -14,9 +14,25 @@ export type SentinelDeletion = {
     reason: string;
 };
 
+export type RogueNodeHit = {
+    device_id: string;
+    reason: string;
+    blockedAt: string;
+};
+
+export type JammingHit = {
+    device_id: string;
+    silent_for_sec: number;
+    last_seen_iso: string;
+};
+
 export type SentinelReport = {
     scannedUsers: number;
     deleted: SentinelDeletion[];
+    rogueNodeAttempts: RogueNodeHit[];
+    rogueNodeWindowSec: number;
+    jammingSuspects: JammingHit[];
+    jammingThresholdSec: number;
     durationMs: number;
     runAt: Date;
 };

@@ -5,9 +5,16 @@
     } from "@/lib/firebaseAdmin";
     import { requireAdmin } from "@/lib/security/requireAdmin";
 
+    // FLIP FOR THE BEFORE / AFTER CYBERATTACK #5 SCREENSHOTS.
+    // When false: the guard is bypassed and any anonymous POST can mint a
+    // Firebase Auth admin. Use the Cyber Demos page to capture proof.
+    const ADMIN_CREATE_GUARD_ENABLED = true;
+
     export async function POST(req: Request) {
-    const guard = await requireAdmin(req);
-    if ("error" in guard) return guard.error;
+    if (ADMIN_CREATE_GUARD_ENABLED) {
+        const guard = await requireAdmin(req);
+        if ("error" in guard) return guard.error;
+    }
 
     try {
         const body = await req.json();

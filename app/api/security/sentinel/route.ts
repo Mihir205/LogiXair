@@ -14,12 +14,33 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/security/requireAdmin";
 import { adminAuth, adminFirestore } from "@/lib/firebaseAdmin";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
+import { listStaleDevices, STALE_THRESHOLD_SEC } from "@/lib/security/heartbeatTracker";
+import { Timestamp } from "firebase-admin/firestore";
 
 const ROGUE_EMAIL = /^hacker_.*@evil\.com$/i;
+
+// How far back to look for rogue node activity each sweep.
+const ROGUE_NODE_LOOKBACK_MS = 5 * 60 * 1000;
+
+type RogueNodeHit = {
+    device_id: string;
+    reason: string;
+    blockedAt: string;
+};
+
+type JammingHit = {
+    device_id: string;
+    silent_for_sec: number;
+    last_seen_iso: string;
+};
 
 type SentinelReport = {
     scannedUsers: number;
     deleted: { uid: string; email: string; reason: string }[];
+    rogueNodeAttempts: RogueNodeHit[];
+    rogueNodeWindowSec: number;
+    jammingSuspects: JammingHit[];
+    jammingThresholdSec: number;
     durationMs: number;
 };
 
@@ -97,9 +118,67 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
         await quarantine("firestore", doc.id, email, triggeredBy, deleted);
     }
 
+    // ── 3. Scan loraRogueJoinAttempts (continuous LoRa monitoring) ──
+    const rogueNodeAttempts: RogueNodeHit[] = [];
+    try {
+        const since = Timestamp.fromMillis(Date.now() - ROGUE_NODE_LOOKBACK_MS);
+        const rogueSnap = await adminFirestore
+            .collection("loraRogueJoinAttempts")
+            .where("blockedAt", ">=", since)
+            .limit(50)
+            .get();
+        for (const d of rogueSnap.docs) {
+            const data = d.data() as { device_id?: string; reason?: string; blockedAt?: Timestamp };
+            rogueNodeAttempts.push({
+                device_id: data.device_id ?? "(unknown)",
+                reason: data.reason ?? "—",
+                blockedAt: data.blockedAt?.toDate().toISOString() ?? "",
+            });
+        }
+        rogueNodeAttempts.sort((a, b) => b.blockedAt.localeCompare(a.blockedAt));
+    } catch (e) {
+        console.log("[sentinel] rogue-node scan failed:", e instanceof Error ? e.message : e);
+    }
+
+    // ── 4. Jamming watchdog — flag devices that stopped checking in ──
+    const jammingSuspects: JammingHit[] = [];
+    try {
+        const stale = listStaleDevices();
+        for (const s of stale) {
+            jammingSuspects.push({
+                device_id: s.device_id,
+                silent_for_sec: s.silent_for_sec,
+                last_seen_iso: s.last_seen_iso,
+            });
+            // Log to security_events only on the first detection per device.
+            if (s.first_detection) {
+                try {
+                    await logSecurityEvent({
+                        type: "lora_jamming_suspected",
+                        severity: "high",
+                        source: "system",
+                        summary: `LoRa link loss / possible jamming on ${s.device_id} (silent ${s.silent_for_sec}s).`,
+                        target: { device_id: s.device_id, last_seen: s.last_seen_iso },
+                        triggeredBy: { mode: "sentinel", caller: triggeredBy },
+                    });
+                } catch { /* drop silently */ }
+            }
+        }
+    } catch (e) {
+        console.log("[sentinel] jamming scan failed:", e instanceof Error ? e.message : e);
+    }
+
     const durationMs = Date.now() - start;
-    console.log(`[sentinel] sweep done — scanned ${scannedUsers} in ${durationMs}ms, deleted ${deleted.length}`);
-    return { scannedUsers, deleted, durationMs };
+    console.log(`[sentinel] sweep done — scanned ${scannedUsers} users + ${rogueNodeAttempts.length} rogue + ${jammingSuspects.length} jamming in ${durationMs}ms, deleted ${deleted.length}`);
+    return {
+        scannedUsers,
+        deleted,
+        rogueNodeAttempts,
+        rogueNodeWindowSec: Math.floor(ROGUE_NODE_LOOKBACK_MS / 1000),
+        jammingSuspects,
+        jammingThresholdSec: STALE_THRESHOLD_SEC,
+        durationMs,
+    };
 }
 
 export async function GET(req: Request) {
