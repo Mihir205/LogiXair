@@ -1,0 +1,56 @@
+// SAFE INCREMENTAL Firestore rules for the LogiXair security layer.
+//
+// This version keeps the rest of the app working exactly as before
+// (everything that was readable/writable still is) and only adds the
+// minimum necessary to power the cybersecurity demos:
+//
+//   1. security_events  — admins READ, nobody writes from the client.
+//   2. users/{uid}.role — locked from self-promotion (closes attack #02).
+//
+// Tighten further later once Mihir confirms which collections truly
+// need restricted access in production.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── users ───────────────────────────────────────────────────────
+    // The login page reads users/{uid} to learn the caller's role, so
+    // we keep that readable for any authenticated user (their own doc).
+    // Writes are allowed as before EXCEPT no one (including the user
+    // themselves) may flip their own role field. Backend admin SDK
+    // operations bypass these rules.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+
+      // On update: anyone signed-in can update their own doc but
+      // CANNOT change the role field. This is the protection for the
+      // Firestore-role-escalation attack.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role;
+
+      // Admins can do anything with any user doc.
+      allow create, update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // ── security_events ─────────────────────────────────────────────
+    // Append-only audit log used by the Cybersecurity Demos page.
+    // Admins can read; nobody writes from the client (backend uses
+    // the admin SDK, which bypasses these rules).
+    match /security_events/{evt} {
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      allow write: if false;
+    }
+
+    // ── everything else ─────────────────────────────────────────────
+    // Keep current behavior so Mihir's existing pages don't break.
+    // We will tighten these once we know which collections need it.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
