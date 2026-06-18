@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-  
+
   if (loading || !role) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400">
@@ -104,6 +104,23 @@ export default function AnalyticsPage() {
       value: analytics.daily?.avg_pressure || 0,
     },
   ];
+  const predictionData = [
+    {
+      metric: "Temperature",
+      actual: analytics.weather_station?.payload?.temperature || 0,
+      predicted: analytics.prediction?.next20min?.temperature || 0,
+    },
+    {
+      metric: "Humidity",
+      actual: analytics.weather_station?.payload?.humidity || 0,
+      predicted: analytics.prediction?.next20min?.humidity || 0,
+    },
+    {
+      metric: "Pressure",
+      actual: analytics.weather_station?.payload?.pressure || 0,
+      predicted: analytics.prediction?.next20min?.pressure || 0,
+    },
+  ];
 
   // Dynamic colors for internal Recharts engines
   const gridColor = mounted && theme === "dark" ? "#1e293b" : "#f1f5f9";
@@ -113,218 +130,251 @@ export default function AnalyticsPage() {
 
   return (
     <AuthGuard>
-    <RouteGuard allowedRole={role}>
-    <DashboardLayout role={role}>
-      <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased transition-colors duration-200">
-        
-        {/* CLASSIC B2B HEADER BLOCK */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Weather Analytics Dashboard
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-              Historical trends, sensory correlation parameters, and physical node threshold analytics.
-            </p>
-          </div>
-          
-          <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors duration-200">
-            <Activity size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300">Analytics Active</span>
-          </div>
-        </div>
+      <RouteGuard allowedRole={role}>
+        <DashboardLayout role={role}>
+          <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased transition-colors duration-200">
 
-        {/* METRIC CARDS BENTO GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard
-            title="Avg Temperature"
-            value={`${analytics.daily?.avg_temperature?.toFixed(1) ?? "0.0"} °C`}
-            icon={<Thermometer size={16} className="text-indigo-600 dark:text-indigo-400" />}
-          />
-          <MetricCard
-            title="Avg Humidity"
-            value={`${analytics.daily?.avg_humidity?.toFixed(1) ?? "0.0"} %`}
-            icon={<Droplets size={16} className="text-indigo-600 dark:text-indigo-400" />}
-          />
-          <MetricCard
-            title="Avg Pressure"
-            value={`${analytics.daily?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`}
-            icon={<Gauge size={16} className="text-indigo-600 dark:text-indigo-400" />}
-          />
-          <MetricCard
-            title="Total Readings"
-            value={analytics.daily?.total_readings ?? 0}
-            icon={<History size={16} className="text-indigo-600 dark:text-indigo-400" />}
-          />
-        </div>
-
-        {/* LANDSCAPE TIMELINE GRAPH */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-          <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5">
-            <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-              Hourly Temperature Trend
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Linear time-series calculation values over a 24-hour cycle.</p>
-          </div>
-
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="hour" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}`, color: mounted && theme === 'dark' ? '#f8fafc' : '#0f172a' }} />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="temperature"
-                  stroke="#4f46e5"
-                  strokeWidth={2.5}
-                  dot={{ r: 0 }}
-                  activeDot={{ r: 4, stroke: '#4f46e5', strokeWidth: 1, fill: '#ffffff' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* MID COLUMN GRID ROW */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* PRECIPITATION RATIO GRAPH */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-            <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
+            {/* CLASSIC B2B HEADER BLOCK */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
               <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Rainfall Distribution</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Proportional ratio of precipitation events.</p>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  Weather Analytics Dashboard
+                </h1>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
+                  Historical trends, sensory correlation parameters, and physical node threshold analytics.
+                </p>
               </div>
-              <CloudRain size={15} className="text-slate-400 dark:text-slate-500" />
-            </div>
 
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={rainfallData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    innerRadius={65}
-                    stroke={mounted && theme === "dark" ? "#1e293b" : "#ffffff"}
-                    strokeWidth={2}
-                    paddingAngle={4}
-                    label={{ fontSize: '10px', fill: axisColor, fontWeight: 600 }}
-                  >
-                    {rainfallData.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* HISTORICAL BAR AVERAGES */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-            <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Daily Weather Metrics</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aggregate values for tracking parameters.</p>
+              <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors duration-200">
+                <Activity size={14} className="text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300">Analytics Active</span>
               </div>
-              <Activity size={15} className="text-slate-400 dark:text-slate-500" />
             </div>
 
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="metric" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{ fill: mounted && theme === 'dark' ? '#1e293b' : '#f8fafc' }} contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
-                  <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
-                  <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={32} />
-                </BarChart>
-              </ResponsiveContainer>
+            {/* METRIC CARDS BENTO GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <MetricCard
+                title="Avg Temperature"
+                value={`${analytics.daily?.avg_temperature?.toFixed(1) ?? "0.0"} °C`}
+                icon={<Thermometer size={16} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Avg Humidity"
+                value={`${analytics.daily?.avg_humidity?.toFixed(1) ?? "0.0"} %`}
+                icon={<Droplets size={16} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Avg Pressure"
+                value={`${analytics.daily?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`}
+                icon={<Gauge size={16} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Total Readings"
+                value={analytics.daily?.total_readings ?? 0}
+                icon={<History size={16} className="text-indigo-600 dark:text-indigo-400" />}
+              />
             </div>
-          </div>
-        </div>
 
-        {/* METRICS AGE OVERVIEW LAYER */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* WEEKLY METRICS COLUMN */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-            <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Weekly Analytics</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Rolling 7-day environmental summary averages.</p>
+            {/* LANDSCAPE TIMELINE GRAPH */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5">
+                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                  Hourly Temperature Trend
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Linear time-series calculation values over a 24-hour cycle.</p>
               </div>
-              <Calendar size={15} className="text-slate-400 dark:text-slate-500" />
-            </div>
 
-            <div className="space-y-1">
-              <LogValueRow label="Avg Temperature" value={`${analytics.weekly?.avg_temperature?.toFixed(1) ?? "0.0"} °C`} />
-              <LogValueRow label="Avg Humidity" value={`${analytics.weekly?.avg_humidity?.toFixed(1) ?? "0.0"} %`} />
-              <LogValueRow label="Avg Pressure" value={`${analytics.weekly?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`} />
-              <LogValueRow label="Log Readings Count" value={analytics.weekly?.total_readings ?? 0} isMeta={true} />
-            </div>
-          </div>
-
-          {/* MONTHLY METRICS COLUMN */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-            <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Monthly Analytics</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Comprehensive 30-day structural tracking log.</p>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}`, color: mounted && theme === 'dark' ? '#f8fafc' : '#0f172a' }} />
+                    <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                    <Line
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="#4f46e5"
+                      strokeWidth={2.5}
+                      dot={{ r: 0 }}
+                      activeDot={{ r: 4, stroke: '#4f46e5', strokeWidth: 1, fill: '#ffffff' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <Calendar size={15} className="text-slate-400 dark:text-slate-500" />
             </div>
 
-            <div className="space-y-1">
-              <LogValueRow label="Avg Temperature" value={`${analytics.monthly?.avg_temperature?.toFixed(1) ?? "0.0"} °C`} />
-              <LogValueRow label="Avg Humidity" value={`${analytics.monthly?.avg_humidity?.toFixed(1) ?? "0.0"} %`} />
-              <LogValueRow label="Avg Pressure" value={`${analytics.monthly?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`} />
-              <LogValueRow label="Log Readings Count" value={analytics.monthly?.total_readings ?? 0} isMeta={true} />
-            </div>
-          </div>
-        </div>
+            {/* MID COLUMN GRID ROW */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* ANOMALY DETECTION ENGINE OUTPUT */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-          <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Anomaly Detection Array</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Automated sensory boundary violation calculations.</p>
-            </div>
-            <ShieldAlert size={15} className="text-slate-400 dark:text-slate-500" />
-          </div>
+              {/* PRECIPITATION RATIO GRAPH */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Rainfall Distribution</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Proportional ratio of precipitation events.</p>
+                  </div>
+                  <CloudRain size={15} className="text-slate-400 dark:text-slate-500" />
+                </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/60">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                <AlertTriangle size={15} className={analytics.anomalies?.temperature > 0 ? "text-amber-500" : "text-slate-400 dark:text-slate-500"} />
-                <h4 className="text-sm font-bold">Temperature Deviations: <span className="font-extrabold text-slate-900 dark:text-white">{analytics.anomalies?.temperature ?? 0}</span></h4>
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={rainfallData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        innerRadius={65}
+                        stroke={mounted && theme === "dark" ? "#1e293b" : "#ffffff"}
+                        strokeWidth={2}
+                        paddingAngle={4}
+                        label={{ fontSize: '10px', fill: axisColor, fontWeight: 600 }}
+                      >
+                        {rainfallData.map((_, index) => (
+                          <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-6">
-                System sync marker: {analytics.anomalies?.last_updated ?? "No connection timestamp records"}
-              </p>
+
+              {/* HISTORICAL BAR AVERAGES */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Daily Weather Metrics</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aggregate values for tracking parameters.</p>
+                  </div>
+                  <Activity size={15} className="text-slate-400 dark:text-slate-500" />
+                </div>
+
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dailyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                      <XAxis dataKey="metric" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={{ fill: mounted && theme === 'dark' ? '#1e293b' : '#f8fafc' }} contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
+                      <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={32} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm">
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5">
+                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                  Actual vs Predicted Weather
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  ML forecast for the next 20 minutes compared with current conditions.
+                </p>
+              </div>
+
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={predictionData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="metric" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+
+                    <Bar
+                      dataKey="actual"
+                      fill="#4f46e5"
+                      name="Actual"
+                    />
+
+                    <Bar
+                      dataKey="predicted"
+                      fill="#06b6d4"
+                      name="Predicted"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            <span className={`text-[10px] font-bold tracking-wider px-2.5 py-1 rounded border uppercase self-start sm:self-auto ${
-              analytics.anomalies?.temperature > 0
-                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40"
-                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40"
-            }`}>
-              {analytics.anomalies?.temperature > 0 ? "Attention Required" : "Status Nominal"}
-            </span>
-          </div>
-        </div>
+            {/* METRICS AGE OVERVIEW LAYER */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* WEEKLY METRICS COLUMN */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Weekly Analytics</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Rolling 7-day environmental summary averages.</p>
+                  </div>
+                  <Calendar size={15} className="text-slate-400 dark:text-slate-500" />
+                </div>
 
-      </div>
-    </DashboardLayout>
-    </RouteGuard>
+                <div className="space-y-1">
+                  <LogValueRow label="Avg Temperature" value={`${analytics.weekly?.avg_temperature?.toFixed(1) ?? "0.0"} °C`} />
+                  <LogValueRow label="Avg Humidity" value={`${analytics.weekly?.avg_humidity?.toFixed(1) ?? "0.0"} %`} />
+                  <LogValueRow label="Avg Pressure" value={`${analytics.weekly?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`} />
+                  <LogValueRow label="Log Readings Count" value={analytics.weekly?.total_readings ?? 0} isMeta={true} />
+                </div>
+              </div>
+
+              {/* MONTHLY METRICS COLUMN */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Monthly Analytics</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Comprehensive 30-day structural tracking log.</p>
+                  </div>
+                  <Calendar size={15} className="text-slate-400 dark:text-slate-500" />
+                </div>
+
+                <div className="space-y-1">
+                  <LogValueRow label="Avg Temperature" value={`${analytics.monthly?.avg_temperature?.toFixed(1) ?? "0.0"} °C`} />
+                  <LogValueRow label="Avg Humidity" value={`${analytics.monthly?.avg_humidity?.toFixed(1) ?? "0.0"} %`} />
+                  <LogValueRow label="Avg Pressure" value={`${analytics.monthly?.avg_pressure?.toFixed(1) ?? "0.0"} hPa`} />
+                  <LogValueRow label="Log Readings Count" value={analytics.monthly?.total_readings ?? 0} isMeta={true} />
+                </div>
+              </div>
+            </div>
+
+            {/* ANOMALY DETECTION ENGINE OUTPUT */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Anomaly Detection Array</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Automated sensory boundary violation calculations.</p>
+                </div>
+                <ShieldAlert size={15} className="text-slate-400 dark:text-slate-500" />
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/60">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                    <AlertTriangle size={15} className={analytics.anomalies?.temperature > 0 ? "text-amber-500" : "text-slate-400 dark:text-slate-500"} />
+                    <h4 className="text-sm font-bold">Temperature Deviations: <span className="font-extrabold text-slate-900 dark:text-white">{analytics.anomalies?.temperature ?? 0}</span></h4>
+                  </div>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-6">
+                    System sync marker: {analytics.anomalies?.last_updated ?? "No connection timestamp records"}
+                  </p>
+                </div>
+
+                <span className={`text-[10px] font-bold tracking-wider px-2.5 py-1 rounded border uppercase self-start sm:self-auto ${analytics.anomalies?.temperature > 0
+                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40"
+                  : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40"
+                  }`}>
+                  {analytics.anomalies?.temperature > 0 ? "Attention Required" : "Status Nominal"}
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </DashboardLayout>
+      </RouteGuard>
     </AuthGuard>
   );
 }

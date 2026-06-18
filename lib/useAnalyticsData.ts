@@ -8,19 +8,21 @@ export default function useAnalyticsData() {
   const [analytics, setAnalytics] = useState<any>(null);
 
   useEffect(() => {
-    const analyticsRef = ref(db, "analytics");
+    const analyticsRef = ref(db, "/");
 
     const unsubscribe = onValue(
       analyticsRef,
       (snapshot) => {
         const data = snapshot.val();
 
-        console.log("Analytics Loaded:", data);
-
-        setAnalytics(data);
+        setAnalytics({
+          ...data.analytics,
+          prediction: data.prediction,
+          weather_station: data.weather_station,
+        });
       },
       (error) => {
-        console.error("Analytics Error:", error);
+        console.error(error);
       }
     );
 
