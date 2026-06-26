@@ -13,6 +13,11 @@ import {
   Sun,
   CheckCircle2,
   AlertTriangle,
+  Wind,
+  Compass,
+  Battery,
+  Signal,
+  Cpu,
 } from "lucide-react";
 import useWeatherData from "../../lib/useWeatherData";
 
@@ -83,38 +88,68 @@ export default function UserPage() {
             </div>
 
             {/* METRICS BENTO GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <MetricCard
                 title="Temperature"
-                value={`${weather.temperature}°C`}
+                value={fmt(weather.temperature, "°C", 1)}
                 icon={<Thermometer size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
                 title="Humidity"
-                value={`${weather.humidity}%`}
+                value={fmt(weather.humidity, "%", 0)}
                 icon={<Droplets size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
-                title="Pressure"
-                value={`${weather.pressure?.toFixed(1)} hPa`}
-                icon={<Gauge size={18} className="text-indigo-600 dark:text-indigo-400" />}
-              />
-              <MetricCard
-                title="Rain"
-                value={weather.rain ? "Detected" : "None"}
+                title="Rainfall"
+                value={fmt(weather.rain, " mm", 1)}
                 icon={<CloudSun size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
+                title="Wind Direction"
+                value={fmt(weather.wind_direction, "°", 1)}
+                icon={<Compass size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Wind Max (gust)"
+                value={fmt(weather.wind_max_ms, " m/s", 1)}
+                icon={<Wind size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Wind Avg"
+                value={fmt(weather.wind_avg_ms, " m/s", 1)}
+                icon={<Wind size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Battery"
+                value={weather.battery ?? "—"}
+                icon={<Battery size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Signal (RSSI)"
+                value={fmt(weather.rssi, " dBm", 0)}
+                icon={<Signal size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
+                title="Pressure"
+                value={fmt(weather.pressure, " hPa", 1)}
+                icon={<Gauge size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <MetricCard
                 title="Light Level"
-                value={`${weather.light}`}
+                value={fmt(weather.light, " lx", 0)}
                 icon={<Sun size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
                 title="Irradiance"
-                value={`${weather.irradiance}`}
+                value={fmt(weather.irradiance, " W/m²", 1)}
                 icon={<Sun size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-5 shadow-sm">
+              <MetricCard
+                title="Sensor ID"
+                value={weather.sensor_id !== undefined ? `#${weather.sensor_id}` : "—"}
+                icon={<Cpu size={18} className="text-indigo-600 dark:text-indigo-400" />}
+              />
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-5 shadow-sm sm:col-span-2 lg:col-span-1 xl:col-span-1">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
                     Last Updated
@@ -192,6 +227,18 @@ export default function UserPage() {
 }
 
 /* ---------- Simplified B2B Sub-components ---------- */
+
+/**
+ * Format a possibly-undefined numeric value. Returns "—" when undefined
+ * instead of "undefined hPa" — keeps the dashboard clean while pressure/
+ * light/irradiance sensors are not yet wired to the ESP32.
+ */
+function fmt(value: number | undefined, suffix = "", digits = 1): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${value.toFixed(digits)}${suffix}`;
+}
 
 function MetricCard({ title, value, icon }: any) {
   return (
