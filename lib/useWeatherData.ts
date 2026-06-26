@@ -46,8 +46,12 @@ export default function useWeatherData(): WeatherSnapshot | null {
 
     const unsubscribe = onValue(weatherRef, (snapshot) => {
       const data = snapshot.val();
-      if (!data?.payload) return;
-      const p = data.payload;
+      if (!data) return;
+
+      // Tolerate both shapes:
+      //   New shape (my updated webhook): { payload: {...sensor fields}, receivedAt, topic }
+      //   Old shape (Mihir's legacy webhook): { ...sensor fields flat, receivedAt }
+      const p = data.payload ?? data;
 
       setWeather({
         station_id: p.station_id ?? p.device_id,

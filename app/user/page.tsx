@@ -16,8 +16,6 @@ import {
   Wind,
   Compass,
   Battery,
-  Signal,
-  Cpu,
 } from "lucide-react";
 import useWeatherData from "../../lib/useWeatherData";
 
@@ -27,8 +25,11 @@ export default function UserPage() {
   const [formattedTime, setFormattedTime] = useState("--");
 
   useEffect(() => {
-    if (weather?.timestamp) {
-      const date = new Date(weather.timestamp);
+    // Use receivedAt (Firebase write time, real Unix ms) — NOT payload.timestamp
+    // (which is just the ESP32's uptime seconds, not a real date).
+    const ms = weather?.receivedAt;
+    if (typeof ms === "number" && ms > 1_000_000_000_000) {
+      const date = new Date(ms);
 
       setFormattedDate(
         date.toLocaleDateString("en-IN", {
@@ -46,7 +47,7 @@ export default function UserPage() {
         })
       );
     }
-  }, [weather?.timestamp]);
+  }, [weather?.receivedAt]);
 
   // Clean, minimal inline loading state supporting theme colors
   if (!weather) {
@@ -125,29 +126,14 @@ export default function UserPage() {
                 icon={<Battery size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
-                title="Signal (RSSI)"
-                value={fmt(weather.rssi, " dBm", 0)}
-                icon={<Signal size={18} className="text-indigo-600 dark:text-indigo-400" />}
-              />
-              <MetricCard
                 title="Pressure"
                 value={fmt(weather.pressure, " hPa", 1)}
                 icon={<Gauge size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <MetricCard
-                title="Light Level"
-                value={fmt(weather.light, " lx", 0)}
-                icon={<Sun size={18} className="text-indigo-600 dark:text-indigo-400" />}
-              />
-              <MetricCard
                 title="Irradiance"
                 value={fmt(weather.irradiance, " W/m²", 1)}
                 icon={<Sun size={18} className="text-indigo-600 dark:text-indigo-400" />}
-              />
-              <MetricCard
-                title="Sensor ID"
-                value={weather.sensor_id !== undefined ? `#${weather.sensor_id}` : "—"}
-                icon={<Cpu size={18} className="text-indigo-600 dark:text-indigo-400" />}
               />
               <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-5 shadow-sm sm:col-span-2 lg:col-span-1 xl:col-span-1">
                 <div className="flex items-center justify-between">
