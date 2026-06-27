@@ -10,15 +10,14 @@ import { Timestamp, FieldValue, type CollectionReference } from "firebase-admin/
 
 export const LORA_ATTEMPTS_ROOT = "loraAttempts";
 
-export type LoraAttemptDoc = {
+export type LoraAttemptInput = {
     device_id: string;
     reason: string;
     detail?: string;
-    blockedAt: Timestamp;
-    [key: string]: unknown;
+    [extra: string]: unknown;
 };
 
-async function safeAdd(kind: string, doc: LoraAttemptDoc): Promise<void> {
+async function safeAdd(kind: string, input: LoraAttemptInput): Promise<void> {
     try {
         await adminFirestore
             .collection(LORA_ATTEMPTS_ROOT)
@@ -28,24 +27,24 @@ async function safeAdd(kind: string, doc: LoraAttemptDoc): Promise<void> {
             .collection(LORA_ATTEMPTS_ROOT)
             .doc(kind)
             .collection("log")
-            .add(doc);
+            .add({ ...input, blockedAt: Timestamp.now() });
     } catch { /* never throw from a logger */ }
 }
 
-export function logLoraRogueJoinAttempt(doc: Omit<LoraAttemptDoc, "blockedAt">) {
-    return safeAdd("rogueJoin", { ...doc, blockedAt: Timestamp.now() });
+export function logLoraRogueJoinAttempt(input: LoraAttemptInput) {
+    return safeAdd("rogueJoin", input);
 }
 
-export function logLoraInjectionAttempt(doc: Omit<LoraAttemptDoc, "blockedAt">) {
-    return safeAdd("injection", { ...doc, blockedAt: Timestamp.now() });
+export function logLoraInjectionAttempt(input: LoraAttemptInput) {
+    return safeAdd("injection", input);
 }
 
-export function logLoraReplayAttempt(doc: Omit<LoraAttemptDoc, "blockedAt">) {
-    return safeAdd("replay", { ...doc, blockedAt: Timestamp.now() });
+export function logLoraReplayAttempt(input: LoraAttemptInput) {
+    return safeAdd("replay", input);
 }
 
-export function logLoraPlaintextAttempt(doc: Omit<LoraAttemptDoc, "blockedAt">) {
-    return safeAdd("plaintext", { ...doc, blockedAt: Timestamp.now() });
+export function logLoraPlaintextAttempt(input: LoraAttemptInput) {
+    return safeAdd("plaintext", input);
 }
 
 /** Path helper for the Sentinel to read a specific kind's log subcollection. */
