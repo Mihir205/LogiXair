@@ -25,6 +25,8 @@ export const HMAC_GUARD_ENABLED = false;
 const DEVICE_PSK: Record<string, string> = {
     "DEMO-NODE-01": "lora-psk-DEMO-NODE-01-c4f8a210e5",
     "DEMO-NODE-02": "lora-psk-DEMO-NODE-02-7b3e91f2d0",
+    // Demo device for the MQTT crypto-parity attacks (M16/M17/M18).
+    "STATION-ATTACK-DEMO": "mqtt-psk-STATION-ATTACK-DEMO-94e1c20fb7",
 };
 
 export type HmacDecision =

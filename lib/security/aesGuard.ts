@@ -29,6 +29,7 @@ const DEVICE_AES_KEY: Record<string, string> = {
     // 32 bytes hex = AES-256
     "DEMO-NODE-01": "20cf5fa6f33e9b1d0e8f97a4b5c2d318e7a4b5c2d318e7a4b5c2d318e7a4b5c2",
     "DEMO-NODE-02": "5fa6f33e9b1d0e8f97a4b5c2d318e7a4b5c2d318e7a4b5c2d318e7a420cf5fa6",
+    "STATION-ATTACK-DEMO": "94e1c20fb71d0e8f97a4b5c2d318e7a4b5c2d318e7a4b5c2d318e7a420cf5fa6",
 };
 
 export type AesDecision =

@@ -1,0 +1,48 @@
+version: "3.8"
+
+# EMQX broker for the LogiXair MQTT-only telemetry plane.
+#
+# Two listener tiers:
+#   1883/tcp — local dev only (NEVER expose to internet)
+#   8883/tls — production MQTT-over-TLS for stations + backend
+#
+# Hardening enforced via etc/emqx.conf + etc/acl.conf:
+#   M1  anonymous CONNECT blocked        (allow_anonymous = false)
+#   M2  CONNECT brute-force limited      (listener rate-limit)
+#   M3  per-station ACL                  (stations/${clientid}/#)
+#   M4  wildcard subscribe denied        (backend role only)
+#   M5  retained-message poisoning off   (retain_available = false)
+#   M7  oversized payload DoS capped     (max_packet_size = 2 KB)
+#   M8  CONNECT flood capped             (max_connections + max_conn_rate)
+#  M10  LWT abuse restricted             (ACL deny LWT on telemetry topic)
+#
+# Toggle hardened defaults on/off for before/after demos by swapping
+# emqx.conf  <->  emqx.vulnerable.conf  in the volume mount below.
+services:
+  emqx:
+    image: emqx/emqx:5.8.0
+    container_name: logixair-emqx
+    restart: unless-stopped
+    ports:
+      - "1883:1883"     # MQTT plain — dev only
+      - "8883:8883"     # MQTT over TLS — prod
+      - "18083:18083"   # Dashboard (admin/public — change on first login)
+    volumes:
+      - ./etc/emqx.conf:/opt/emqx/etc/emqx.conf:ro
+      - ./etc/acl.conf:/opt/emqx/etc/acl.conf:ro
+      - ./etc/users.conf:/opt/emqx/etc/users.conf:ro
+      - ./certs:/opt/emqx/etc/certs:ro
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    environment:
+      EMQX_NODE__COOKIE: "logixair-cookie-change-me"
+      EMQX_LOG__CONSOLE_HANDLER__LEVEL: "info"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  emqx_data:
+  emqx_log:

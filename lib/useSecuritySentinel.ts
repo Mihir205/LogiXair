@@ -26,6 +26,24 @@ export type JammingHit = {
     last_seen_iso: string;
 };
 
+export type MqttIncidentBucket = {
+    label: string;
+    type_prefix: string;
+    severity: "critical" | "high" | "medium";
+    count: number;
+    latest_iso: string | null;
+};
+
+export type IdsAlert = {
+    rule_id: string;
+    rule_kind: "rate" | "pattern" | "trend";
+    severity: "critical" | "high" | "medium";
+    message: string;
+    count?: number;
+    metric?: Record<string, unknown>;
+    detected_at: string;
+};
+
 export type SentinelReport = {
     scannedUsers: number;
     deleted: SentinelDeletion[];
@@ -33,6 +51,10 @@ export type SentinelReport = {
     rogueNodeWindowSec: number;
     jammingSuspects: JammingHit[];
     jammingThresholdSec: number;
+    mqttIncidents: MqttIncidentBucket[];
+    mqttIncidentWindowSec: number;
+    idsAlertsFiredThisSweep: IdsAlert[];
+    idsAlertsRecent: IdsAlert[];
     durationMs: number;
     runAt: Date;
 };
@@ -60,7 +82,8 @@ export default function useSecuritySentinel(intervalMs = 30_000) {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) {
-                    setError(`Sentinel HTTP ${res.status}`);
+                    const body = await res.text().catch(() => "");
+                    setError(`Sentinel HTTP ${res.status}: ${body.slice(0, 300)}`);
                     return;
                 }
                 const data = (await res.json()) as Omit<SentinelReport, "runAt">;

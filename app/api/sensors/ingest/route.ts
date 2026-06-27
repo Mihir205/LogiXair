@@ -19,8 +19,12 @@ import { checkHmac, HMAC_GUARD_ENABLED } from "@/lib/security/hmacGuard";
 import { decryptOrPass, AES_ENCRYPTION_REQUIRED } from "@/lib/security/aesGuard";
 import { checkDevice, DEVICE_REGISTRY_ENABLED } from "@/lib/security/deviceRegistry";
 import { recordHeartbeat } from "@/lib/security/heartbeatTracker";
-import { adminFirestore } from "@/lib/firebaseAdmin";
-import { Timestamp } from "firebase-admin/firestore";
+import {
+    logLoraRogueJoinAttempt,
+    logLoraInjectionAttempt,
+    logLoraReplayAttempt,
+    logLoraPlaintextAttempt,
+} from "@/lib/security/loraAttemptLogger";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
 
 interface TelemetryFrame {
@@ -60,14 +64,11 @@ export async function POST(req: Request) {
     // ── 0. Device registry guard (rogue node join) ────────────────
     const dev = checkDevice(body.device_id);
     if (!dev.accepted) {
-        try {
-            await adminFirestore.collection("loraRogueJoinAttempts").add({
-                device_id: body.device_id,
-                reason: dev.reason,
-                detail: dev.detail,
-                blockedAt: Timestamp.now(),
-            });
-        } catch { /* drop silently */ }
+        await logLoraRogueJoinAttempt({
+            device_id: body.device_id,
+            reason: dev.reason,
+            detail: dev.detail,
+        });
         // Also surface in the Live Security Alerts feed on Cyber Demos page.
         try {
             await logSecurityEvent({
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
                 reason: dev.reason,
                 detail: dev.detail,
                 registry_enabled: DEVICE_REGISTRY_ENABLED,
-                logged_to: "loraRogueJoinAttempts",
+                logged_to: "loraAttempts/rogueJoin/log",
             },
             { status: 403 },
         );
@@ -97,15 +98,12 @@ export async function POST(req: Request) {
     const providedMic = req.headers.get("x-lora-mic");
     const hmac = checkHmac(body.device_id, rawBody, providedMic);
     if (!hmac.accepted) {
-        try {
-            await adminFirestore.collection("loraInjectionAttempts").add({
-                device_id: body.device_id,
-                reason: hmac.reason,
-                detail: hmac.detail,
-                provided_mic: providedMic ?? null,
-                blockedAt: Timestamp.now(),
-            });
-        } catch { /* drop silently */ }
+        await logLoraInjectionAttempt({
+            device_id: body.device_id,
+            reason: hmac.reason,
+            detail: hmac.detail,
+            provided_mic: providedMic ?? null,
+        });
         return NextResponse.json(
             {
                 success: false,
@@ -114,7 +112,7 @@ export async function POST(req: Request) {
                 reason: hmac.reason,
                 detail: hmac.detail,
                 guard_enabled: HMAC_GUARD_ENABLED,
-                logged_to: "loraInjectionAttempts",
+                logged_to: "loraAttempts/injection/log",
             },
             { status: 401 },
         );
@@ -123,16 +121,13 @@ export async function POST(req: Request) {
     // ── 2. Replay guard ───────────────────────────────────────────
     const decision = checkReplay(body.device_id, body.timestamp, body.nonce);
     if (!decision.accepted) {
-        try {
-            await adminFirestore.collection("loraReplayAttempts").add({
-                device_id: body.device_id,
-                nonce: body.nonce,
-                packet_timestamp: body.timestamp,
-                reason: decision.reason,
-                detail: decision.detail,
-                blockedAt: Timestamp.now(),
-            });
-        } catch { /* drop silently */ }
+        await logLoraReplayAttempt({
+            device_id: body.device_id,
+            nonce: body.nonce,
+            packet_timestamp: body.timestamp,
+            reason: decision.reason,
+            detail: decision.detail,
+        });
         return NextResponse.json(
             {
                 success: false,
@@ -141,7 +136,7 @@ export async function POST(req: Request) {
                 reason: decision.reason,
                 detail: decision.detail,
                 guard_enabled: REPLAY_GUARD_ENABLED,
-                logged_to: "loraReplayAttempts",
+                logged_to: "loraAttempts/replay/log",
             },
             { status: 409 },
         );
@@ -155,14 +150,11 @@ export async function POST(req: Request) {
         ciphertext: body.ciphertext,
     });
     if (!aes.accepted) {
-        try {
-            await adminFirestore.collection("loraPlaintextAttempts").add({
-                device_id: body.device_id,
-                reason: aes.reason,
-                detail: aes.detail,
-                blockedAt: Timestamp.now(),
-            });
-        } catch { /* drop silently */ }
+        await logLoraPlaintextAttempt({
+            device_id: body.device_id,
+            reason: aes.reason,
+            detail: aes.detail,
+        });
         return NextResponse.json(
             {
                 success: false,
@@ -171,7 +163,7 @@ export async function POST(req: Request) {
                 reason: aes.reason,
                 detail: aes.detail,
                 aes_required: AES_ENCRYPTION_REQUIRED,
-                logged_to: "loraPlaintextAttempts",
+                logged_to: "loraAttempts/plaintext/log",
             },
             { status: 400 },
         );

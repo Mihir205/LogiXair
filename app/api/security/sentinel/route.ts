@@ -16,6 +16,8 @@ import { adminAuth } from "@/lib/firebaseAuth";
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
 import { listStaleDevices, STALE_THRESHOLD_SEC } from "@/lib/security/heartbeatTracker";
+import { runIdsScan, recentIdsAlerts, type IdsAlert } from "@/lib/security/ids";
+import { loraAttemptLogRef } from "@/lib/security/loraAttemptLogger";
 import { Timestamp } from "firebase-admin/firestore";
 
 const ROGUE_EMAIL = /^hacker_.*@evil\.com$/i;
@@ -35,6 +37,14 @@ type JammingHit = {
     last_seen_iso: string;
 };
 
+type MqttIncidentBucket = {
+    label: string;
+    type_prefix: string;
+    severity: "critical" | "high" | "medium";
+    count: number;
+    latest_iso: string | null;
+};
+
 type SentinelReport = {
     scannedUsers: number;
     deleted: { uid: string; email: string; reason: string }[];
@@ -42,8 +52,29 @@ type SentinelReport = {
     rogueNodeWindowSec: number;
     jammingSuspects: JammingHit[];
     jammingThresholdSec: number;
+    mqttIncidents: MqttIncidentBucket[];
+    mqttIncidentWindowSec: number;
+    idsAlertsFiredThisSweep: IdsAlert[];
+    idsAlertsRecent: IdsAlert[];
     durationMs: number;
 };
+
+// MQTT incident buckets — each row matches a prefix in security_events.type
+// so any future MQTT attack types (M2, M8, etc.) auto-classify by prefix.
+const MQTT_INCIDENT_BUCKETS: Omit<MqttIncidentBucket, "count" | "latest_iso">[] = [
+    { label: "Webhook spoof attempts",          type_prefix: "emqx_webhook_unsigned",   severity: "high"     },
+    { label: "Webhook guard DISABLED hits",     type_prefix: "emqx_webhook_guard_disabled", severity: "critical" },
+    { label: "Oversized payload blocked",       type_prefix: "emqx_webhook_oversized",  severity: "high"     },
+    { label: "Retained-message poisoning",      type_prefix: "emqx_webhook_retained",   severity: "high"     },
+    { label: "Anonymous CONNECT attempts",      type_prefix: "mqtt_anon_connect",       severity: "critical" },
+    { label: "Cross-station publish attempts",  type_prefix: "mqtt_cross_station",      severity: "critical" },
+    { label: "Oversized MQTT publish",          type_prefix: "mqtt_oversized_payload",  severity: "high"     },
+    { label: "Retained-message poisoning",      type_prefix: "mqtt_retained_poison",    severity: "high"     },
+    { label: "MQTT replay attempts",            type_prefix: "mqtt_replay",             severity: "critical" },
+    { label: "MQTT packet injection",           type_prefix: "mqtt_injection",          severity: "critical" },
+    { label: "MQTT plaintext (eavesdrop risk)", type_prefix: "mqtt_plaintext",          severity: "high"     },
+];
+const MQTT_INCIDENT_WINDOW_MS = 5 * 60 * 1000;
 
 async function quarantine(
     label: string,
@@ -123,8 +154,7 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
     const rogueNodeAttempts: RogueNodeHit[] = [];
     try {
         const since = Timestamp.fromMillis(Date.now() - ROGUE_NODE_LOOKBACK_MS);
-        const rogueSnap = await adminFirestore
-            .collection("loraRogueJoinAttempts")
+        const rogueSnap = await loraAttemptLogRef("rogueJoin")
             .where("blockedAt", ">=", since)
             .limit(50)
             .get();
@@ -169,8 +199,48 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
         console.log("[sentinel] jamming scan failed:", e instanceof Error ? e.message : e);
     }
 
+    // ── 5. MQTT incident scan (Attacks 11, M1, M3, M5, M7) ─────────
+    // Aggregate security_events from the last 5 minutes by type prefix so
+    // the dashboard banner shows live MQTT attack activity without flooding.
+    const mqttIncidents: MqttIncidentBucket[] = MQTT_INCIDENT_BUCKETS.map((b) => ({ ...b, count: 0, latest_iso: null }));
+    try {
+        const since = Timestamp.fromMillis(Date.now() - MQTT_INCIDENT_WINDOW_MS);
+        const evtSnap = await adminFirestore
+            .collection("security_events")
+            .where("timestamp", ">=", since)
+            .limit(500)
+            .get();
+        for (const d of evtSnap.docs) {
+            const data = d.data() as { type?: string; timestamp?: Timestamp };
+            if (!data.type) continue;
+            for (const bucket of mqttIncidents) {
+                if (data.type.startsWith(bucket.type_prefix)) {
+                    bucket.count += 1;
+                    const iso = data.timestamp?.toDate().toISOString() ?? null;
+                    if (iso && (!bucket.latest_iso || iso > bucket.latest_iso)) {
+                        bucket.latest_iso = iso;
+                    }
+                    break;
+                }
+            }
+        }
+    } catch (e) {
+        console.log("[sentinel] mqtt-incident scan failed:", e instanceof Error ? e.message : e);
+    }
+
+    // ── 6. IDS scan (rate + pattern + trend rules over security_events) ─
+    let idsAlertsFiredThisSweep: IdsAlert[] = [];
+    let idsAlertsRecent: IdsAlert[] = [];
+    try {
+        idsAlertsFiredThisSweep = await runIdsScan();
+        idsAlertsRecent = await recentIdsAlerts(10);
+    } catch (e) {
+        console.log("[sentinel] ids scan failed:", e instanceof Error ? e.message : e);
+    }
+
     const durationMs = Date.now() - start;
-    console.log(`[sentinel] sweep done — scanned ${scannedUsers} users + ${rogueNodeAttempts.length} rogue + ${jammingSuspects.length} jamming in ${durationMs}ms, deleted ${deleted.length}`);
+    const totalMqtt = mqttIncidents.reduce((n, b) => n + b.count, 0);
+    console.log(`[sentinel] sweep done — scanned ${scannedUsers} users + ${rogueNodeAttempts.length} rogue + ${jammingSuspects.length} jamming + ${totalMqtt} mqtt + ${idsAlertsFiredThisSweep.length} ids-fired in ${durationMs}ms, deleted ${deleted.length}`);
     return {
         scannedUsers,
         deleted,
@@ -178,6 +248,10 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
         rogueNodeWindowSec: Math.floor(ROGUE_NODE_LOOKBACK_MS / 1000),
         jammingSuspects,
         jammingThresholdSec: STALE_THRESHOLD_SEC,
+        mqttIncidents,
+        mqttIncidentWindowSec: Math.floor(MQTT_INCIDENT_WINDOW_MS / 1000),
+        idsAlertsFiredThisSweep,
+        idsAlertsRecent,
         durationMs,
     };
 }
