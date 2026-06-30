@@ -16,8 +16,6 @@ import { adminAuth } from "@/lib/firebaseAuth";
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
 import { listStaleDevices, STALE_THRESHOLD_SEC } from "@/lib/security/heartbeatTracker";
-import { runIdsScan, recentIdsAlerts, type IdsAlert } from "@/lib/security/ids";
-import { loraAttemptLogRef } from "@/lib/security/loraAttemptLogger";
 import { Timestamp } from "firebase-admin/firestore";
 
 const ROGUE_EMAIL = /^hacker_.*@evil\.com$/i;
@@ -54,8 +52,6 @@ type SentinelReport = {
     jammingThresholdSec: number;
     mqttIncidents: MqttIncidentBucket[];
     mqttIncidentWindowSec: number;
-    idsAlertsFiredThisSweep: IdsAlert[];
-    idsAlertsRecent: IdsAlert[];
     durationMs: number;
 };
 
@@ -70,9 +66,6 @@ const MQTT_INCIDENT_BUCKETS: Omit<MqttIncidentBucket, "count" | "latest_iso">[] 
     { label: "Cross-station publish attempts",  type_prefix: "mqtt_cross_station",      severity: "critical" },
     { label: "Oversized MQTT publish",          type_prefix: "mqtt_oversized_payload",  severity: "high"     },
     { label: "Retained-message poisoning",      type_prefix: "mqtt_retained_poison",    severity: "high"     },
-    { label: "MQTT replay attempts",            type_prefix: "mqtt_replay",             severity: "critical" },
-    { label: "MQTT packet injection",           type_prefix: "mqtt_injection",          severity: "critical" },
-    { label: "MQTT plaintext (eavesdrop risk)", type_prefix: "mqtt_plaintext",          severity: "high"     },
 ];
 const MQTT_INCIDENT_WINDOW_MS = 5 * 60 * 1000;
 
@@ -154,7 +147,8 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
     const rogueNodeAttempts: RogueNodeHit[] = [];
     try {
         const since = Timestamp.fromMillis(Date.now() - ROGUE_NODE_LOOKBACK_MS);
-        const rogueSnap = await loraAttemptLogRef("rogueJoin")
+        const rogueSnap = await adminFirestore
+            .collection("loraRogueJoinAttempts")
             .where("blockedAt", ">=", since)
             .limit(50)
             .get();
@@ -228,19 +222,9 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
         console.log("[sentinel] mqtt-incident scan failed:", e instanceof Error ? e.message : e);
     }
 
-    // ── 6. IDS scan (rate + pattern + trend rules over security_events) ─
-    let idsAlertsFiredThisSweep: IdsAlert[] = [];
-    let idsAlertsRecent: IdsAlert[] = [];
-    try {
-        idsAlertsFiredThisSweep = await runIdsScan();
-        idsAlertsRecent = await recentIdsAlerts(10);
-    } catch (e) {
-        console.log("[sentinel] ids scan failed:", e instanceof Error ? e.message : e);
-    }
-
     const durationMs = Date.now() - start;
     const totalMqtt = mqttIncidents.reduce((n, b) => n + b.count, 0);
-    console.log(`[sentinel] sweep done — scanned ${scannedUsers} users + ${rogueNodeAttempts.length} rogue + ${jammingSuspects.length} jamming + ${totalMqtt} mqtt + ${idsAlertsFiredThisSweep.length} ids-fired in ${durationMs}ms, deleted ${deleted.length}`);
+    console.log(`[sentinel] sweep done — scanned ${scannedUsers} users + ${rogueNodeAttempts.length} rogue + ${jammingSuspects.length} jamming + ${totalMqtt} mqtt in ${durationMs}ms, deleted ${deleted.length}`);
     return {
         scannedUsers,
         deleted,
@@ -250,8 +234,6 @@ async function runSentinel(triggeredBy: string): Promise<SentinelReport> {
         jammingThresholdSec: STALE_THRESHOLD_SEC,
         mqttIncidents,
         mqttIncidentWindowSec: Math.floor(MQTT_INCIDENT_WINDOW_MS / 1000),
-        idsAlertsFiredThisSweep,
-        idsAlertsRecent,
         durationMs,
     };
 }

@@ -3,11 +3,13 @@
 /**
  * Cybersecurity Demos — admin-only page.
  *
- * View-only Sentinel surface. There is no "Run Attack" button — every
- * attack is reproduced from the terminal via the toggle-based scripts
- * under  attacks/M*  and the Sentinel + alert feed below detect and
- * surface them automatically. Capture before/after screenshots from
- * the terminal output + this dashboard.
+ *  - Top section: attack cards with "Run Attack" buttons.
+ *  - Bottom section: real-time alert feed subscribed to Firestore
+ *    security_events. New events appear within milliseconds of being
+ *    logged by the attack runner or any guarded API route.
+ *
+ *  When an attack succeeds, the runner auto-cleans the rogue account
+ *  and surfaces a "cleaned up" badge on the alert card.
  */
 import { useState } from "react";
 import RouteGuard from "../../components/RouteGuard";
@@ -15,16 +17,144 @@ import AuthGuard from "../../components/AuthGuard";
 import DashboardLayout from "../../components/DashboardLayout";
 import {
     ShieldAlert,
+    ShieldCheck,
+    PlayCircle,
+    Loader2,
+    Lock,
+    Bug,
+    AlertTriangle,
+    Trash2,
     BellRing,
     CheckCircle2,
-    Radar,
-    Brain,
-    Trash2,
-    Loader2,
 } from "lucide-react";
 import { auth } from "../../../lib/firebase";
 import useSecurityEvents, { SecurityEvent } from "../../../lib/useSecurityEvents";
-import useSecuritySentinel, { type IdsAlert } from "../../../lib/useSecuritySentinel";
+import useSecuritySentinel from "../../../lib/useSecuritySentinel";
+import { Radar } from "lucide-react";
+
+type Severity = "critical" | "high" | "medium";
+type Classification = "exploited" | "blocked" | "error";
+
+type AttackResult = {
+    id: string;
+    name: string;
+    description: string;
+    target: string;
+    method: string;
+    requestBody?: unknown;
+    httpStatus: number;
+    responseBody: unknown;
+    classification: Classification;
+    summary: string;
+    durationMs: number;
+    cleanup?: { performed: boolean; message: string };
+    eventId?: string;
+};
+
+type AttackCardConfig = {
+    id: string;
+    title: string;
+    column: string;
+    severity: Severity;
+    overview: string;
+    protectionModule: string;
+};
+
+/**
+ * Cyber Demos hub policy: only attacks that REQUIRE continuous monitoring
+ * (background sentinel scanning for ongoing exploitation attempts) live
+ * here. One-shot threats whose protection is statically enforced at the
+ * code/route level — XSS sanitiser, clickjack CSP, TLS, replay guard,
+ * HMAC — are validated by toggling their constant + a single screenshot,
+ * not by a Run Attack button. Adding them here would burn Firestore
+ * quota for no extra security value.
+ */
+const ATTACKS: AttackCardConfig[] = [
+    {
+        id: "01",
+        title: "Unauthenticated Admin Creation",
+        column: "Cloud · Insecure API",
+        severity: "critical",
+        overview:
+            "POST /api/admin/create-user accepted anonymous requests. A single curl " +
+            "could mint a new Firebase Auth admin account — the request body's " +
+            "role field was trusted verbatim. The Sentinel scans every 30s and " +
+            "auto-deletes any rogue admin created bypassing this guard.",
+        protectionModule: "lib/security/requireAdmin.ts + Sentinel",
+    },
+    {
+        id: "09",
+        title: "Rogue Node Join",
+        column: "LoRa · Device Registry",
+        severity: "high",
+        overview:
+            "Attacker provisions a brand-new LoRa node with a self-chosen " +
+            "device_id and starts publishing telemetry. Without an explicit " +
+            "allow-list every fabricated reading is persisted as if it came " +
+            "from a real station. Continuously monitored — rogue device_ids " +
+            "can appear at any moment, so the guard re-runs on every ingest.",
+        protectionModule: "lib/security/deviceRegistry.ts",
+    },
+    {
+        id: "11",
+        title: "EMQX Webhook Spoofing",
+        column: "MQTT · Cloud Webhook",
+        severity: "critical",
+        overview:
+            "Attacker POSTs a forged telemetry payload directly to " +
+            "/api/emqx-webhook without an x-emqx-signature header. Without " +
+            "WEBHOOK_GUARD_ENABLED, the fake reading lands in Firebase RTDB " +
+            "and poisons the dashboard. Guard recomputes HMAC-SHA256 over " +
+            "the raw body using EMQX_WEBHOOK_SECRET and timing-safe compares.",
+        protectionModule: "lib/security/emqxWebhookGuard.ts",
+    },
+    {
+        id: "M1",
+        title: "Anonymous MQTT CONNECT",
+        column: "MQTT · Broker Auth",
+        severity: "critical",
+        overview:
+            "Connect to EMQX Cloud with no username/password and publish " +
+            "forged telemetry. Broker MUST be configured with " +
+            "allow_anonymous=false in Access Control → Authentication. " +
+            "On EMQX Cloud Serverless this is the default — toggle it off to " +
+            "capture the BEFORE screenshot.",
+        protectionModule: "EMQX Cloud · Access Control → Authentication",
+    },
+    {
+        id: "M3",
+        title: "Cross-Station Publish (ACL Bypass)",
+        column: "MQTT · Topic ACL",
+        severity: "critical",
+        overview:
+            "STATION-DEMO01's credentials publish to STATION-DEMO02's topic. " +
+            "Per-clientid ACL (stations/${clientid}/#) must deny. Configure " +
+            "in EMQX Cloud → Access Control → Authorization → Built-in DB.",
+        protectionModule: "EMQX Cloud · Access Control → Authorization",
+    },
+    {
+        id: "M5",
+        title: "Retained-Message Poisoning",
+        column: "MQTT · Broker Settings",
+        severity: "high",
+        overview:
+            "Publish a poisoned retained message — every new subscriber " +
+            "receives it on connect. Set retain_available=false (or zero-out " +
+            "all retained on telemetry topics) to defend.",
+        protectionModule: "EMQX Cloud · Deployment Settings → MQTT",
+    },
+    {
+        id: "M7",
+        title: "Oversized Payload DoS",
+        column: "MQTT · Quota Drain",
+        severity: "high",
+        overview:
+            "Publish a 64 KB message — bloats the 1 GB/mo Serverless free " +
+            "traffic quota. Cap with max_packet_size=2KB in the EMQX " +
+            "deployment settings.",
+        protectionModule: "EMQX Cloud · Deployment Settings → MQTT",
+    },
+];
 
 export default function SecurityDemosPage() {
     return (
@@ -47,10 +177,9 @@ function SecurityDemos() {
                         Cybersecurity Demos
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-                        Live attack/defense reproductions. Trigger attacks from
-                        the terminal scripts under <code className="font-mono text-[11px]">attacks/M*</code>;
-                        the Sentinel and the alert feed below detect and surface
-                        them automatically.
+                        Live attack/defense reproductions. Each card runs a real
+                        scripted exploit against this deployment, auto-cleans
+                        any rogue artifacts, and logs an alert to the feed.
                     </p>
                 </div>
                 <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -63,11 +192,178 @@ function SecurityDemos() {
 
             <SentinelStatus />
 
-            <IdsPanel />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {ATTACKS.map((a) => (
+                    <AttackCard key={a.id} cfg={a} />
+                ))}
+            </div>
 
             <AlertsFeed />
 
             <FooterLegend />
+        </div>
+    );
+}
+
+function AttackCard({ cfg }: { cfg: AttackCardConfig }) {
+    const [busy, setBusy] = useState(false);
+    const [result, setResult] = useState<AttackResult | null>(null);
+    const [errorText, setErrorText] = useState<string | null>(null);
+
+    async function runAttack() {
+        setBusy(true);
+        setErrorText(null);
+        try {
+            const user = auth.currentUser;
+            if (!user) {
+                setErrorText("Not signed in. Refresh and log in as admin.");
+                return;
+            }
+            const idToken = await user.getIdToken();
+            const res = await fetch(`/api/security/run-attack/${cfg.id}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+            if (!res.ok) {
+                const txt = await res.text();
+                setErrorText(`Runner returned ${res.status}: ${txt}`);
+                return;
+            }
+            const data: AttackResult = await res.json();
+            setResult(data);
+        } catch (e) {
+            setErrorText(e instanceof Error ? e.message : "Unknown failure");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                    <SeverityBadge severity={cfg.severity} />
+                    <div>
+                        <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                            #{cfg.id} — {cfg.title}
+                        </h2>
+                        <p className="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                            {cfg.column}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    onClick={runAttack}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    {busy ? (
+                        <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Running
+                        </>
+                    ) : (
+                        <>
+                            <PlayCircle size={14} />
+                            Run Attack
+                        </>
+                    )}
+                </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {cfg.overview}
+            </p>
+
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-3">
+                <Lock size={11} />
+                <span className="font-mono">{cfg.protectionModule}</span>
+            </div>
+
+            {errorText && (
+                <div className="text-xs text-rose-600 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-lg p-3 flex items-start gap-2">
+                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>{errorText}</span>
+                </div>
+            )}
+
+            {result && <ResultPanel result={result} />}
+        </div>
+    );
+}
+
+function ResultPanel({ result }: { result: AttackResult }) {
+    const tone =
+        result.classification === "exploited"
+            ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300"
+            : result.classification === "blocked"
+                ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300";
+    const Icon =
+        result.classification === "exploited"
+            ? Bug
+            : result.classification === "blocked"
+                ? ShieldCheck
+                : AlertTriangle;
+    const label =
+        result.classification === "exploited"
+            ? "VULNERABILITY EXPLOITED"
+            : result.classification === "blocked"
+                ? "ATTACK BLOCKED"
+                : "RUNTIME ERROR";
+
+    return (
+        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+            <div className={`px-4 py-2.5 flex items-center justify-between border-b ${tone}`}>
+                <div className="flex items-center gap-2">
+                    <Icon size={15} />
+                    <span className="text-xs font-bold tracking-wider uppercase">{label}</span>
+                </div>
+                <span className="text-[10px] font-mono opacity-70">{result.durationMs} ms</span>
+            </div>
+            <div className="bg-slate-900 dark:bg-slate-950 text-slate-100 text-[11px] font-mono p-4 space-y-3">
+                <div>
+                    <span className="text-slate-500">→</span>{" "}
+                    <span className="text-amber-300">{result.method}</span>{" "}
+                    <span className="text-slate-200">{result.target}</span>
+                </div>
+                {result.requestBody !== undefined && (
+                    <div>
+                        <div className="text-slate-500 mb-1">request body:</div>
+                        <pre className="whitespace-pre-wrap break-all text-slate-300">
+                            {JSON.stringify(result.requestBody, null, 2)}
+                        </pre>
+                    </div>
+                )}
+                <div>
+                    <span className="text-slate-500">←</span> HTTP{" "}
+                    <span className={result.httpStatus >= 200 && result.httpStatus < 300 ? "text-emerald-400" : "text-rose-400"}>
+                        {result.httpStatus}
+                    </span>
+                </div>
+                <div>
+                    <div className="text-slate-500 mb-1">response body:</div>
+                    <pre className="whitespace-pre-wrap break-all text-slate-300">
+                        {typeof result.responseBody === "string"
+                            ? result.responseBody
+                            : JSON.stringify(result.responseBody, null, 2)}
+                    </pre>
+                </div>
+                <div className="border-t border-slate-700 pt-3 text-slate-300">{result.summary}</div>
+                {result.cleanup && (
+                    <div
+                        className={`border-t border-slate-700 pt-3 flex items-start gap-2 ${
+                            result.cleanup.performed ? "text-emerald-300" : "text-amber-300"
+                        }`}
+                    >
+                        {result.cleanup.performed ? <Trash2 size={12} className="mt-0.5" /> : <AlertTriangle size={12} className="mt-0.5" />}
+                        <span>{result.cleanup.message}</span>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -196,119 +492,6 @@ function SentinelStatus() {
     );
 }
 
-function IdsPanel() {
-    const { report } = useSecuritySentinel(30_000);
-    const fired = report?.idsAlertsFiredThisSweep ?? [];
-    const recent = report?.idsAlertsRecent ?? [];
-    const [clearing, setClearing] = useState(false);
-    const [clearMsg, setClearMsg] = useState<string | null>(null);
-    const tone = fired.length > 0
-        ? "border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30"
-        : recent.length > 0
-            ? "border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
-            : "border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900";
-
-    async function clearAll() {
-        if (!confirm("Delete every doc in idsAlerts? This cannot be undone.")) return;
-        setClearing(true);
-        setClearMsg(null);
-        try {
-            const user = auth.currentUser;
-            if (!user) { setClearMsg("Not signed in."); return; }
-            const token = await user.getIdToken();
-            const res = await fetch("/api/security/ids-clear", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                setClearMsg(`Failed: ${(data as { error?: string }).error ?? res.status}`);
-            } else {
-                setClearMsg(`Cleared ${(data as { deleted?: number }).deleted ?? 0} alerts. Refresh in 30s for sweep update.`);
-            }
-        } catch (e) {
-            setClearMsg(`Failed: ${e instanceof Error ? e.message : "unknown"}`);
-        } finally {
-            setClearing(false);
-        }
-    }
-
-    return (
-        <div className={`rounded-xl border p-4 ${tone}`}>
-            <div className="flex items-center justify-between mb-3 gap-3">
-                <div className="flex items-center gap-2">
-                    <Brain size={16} className="text-indigo-600 dark:text-indigo-400" />
-                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                        Lightweight IDS — rate / pattern / trend rules
-                    </h2>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={clearAll}
-                        disabled={clearing}
-                        className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        title="Delete every idsAlerts doc"
-                    >
-                        {clearing ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-                        Clear all
-                    </button>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                        refs [8] [9] [10] [11] · idsAlerts collection
-                    </span>
-                </div>
-            </div>
-            {clearMsg && (
-                <p className="text-[11px] mb-2 text-slate-600 dark:text-slate-400">{clearMsg}</p>
-            )}
-
-            {fired.length > 0 && (
-                <div className="mb-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 mb-1">
-                        Fired this sweep ({fired.length}):
-                    </p>
-                    <ul className="space-y-1">
-                        {fired.map((a) => <IdsRow key={a.rule_id + a.detected_at} alert={a} fresh />)}
-                    </ul>
-                </div>
-            )}
-
-            {recent.length > 0 ? (
-                <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                        Recent IDS alerts ({recent.length}):
-                    </p>
-                    <ul className="space-y-1">
-                        {recent.map((a) => <IdsRow key={a.rule_id + a.detected_at} alert={a} />)}
-                    </ul>
-                </div>
-            ) : fired.length === 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                    No IDS rules have fired. Run an attack 3+ times in 60s to trip a rate rule, or stage a rogue-node + anon-CONNECT combo for the coordinated-recon pattern.
-                </p>
-            )}
-        </div>
-    );
-}
-
-function IdsRow({ alert, fresh }: { alert: IdsAlert; fresh?: boolean }) {
-    const sevColor = alert.severity === "critical"
-        ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60"
-        : alert.severity === "high"
-            ? "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60"
-            : "text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60";
-    const time = alert.detected_at ? new Date(alert.detected_at).toLocaleTimeString() : "—";
-    return (
-        <li className={`flex items-start gap-2 text-xs px-2 py-1.5 rounded ${fresh ? "ring-1 ring-rose-300" : ""}`}>
-            <span className={`mt-0.5 inline-flex items-center text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded border ${sevColor}`}>
-                {alert.severity}
-            </span>
-            <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 mt-1 shrink-0">{alert.rule_kind}</span>
-            <span className="flex-1 text-slate-800 dark:text-slate-200">{alert.message}</span>
-            <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 mt-1 shrink-0">{time}</span>
-        </li>
-    );
-}
-
 function AlertsFeed() {
     const { events, loading, error } = useSecurityEvents(20);
     return (
@@ -338,7 +521,7 @@ function AlertsFeed() {
                 )}
                 {!loading && !error && events.length === 0 && (
                     <FeedRow muted>
-                        No events yet. Run a script under <code className="font-mono text-[11px]">attacks/M*</code> to generate one.
+                        No events yet. Click <em>Run Attack</em> above to generate one.
                     </FeedRow>
                 )}
                 {events.map((e) => (
@@ -415,17 +598,30 @@ function FeedRow({
     );
 }
 
+function SeverityBadge({ severity }: { severity: Severity }) {
+    const map = {
+        critical: "bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60",
+        high: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60",
+        medium: "bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900/60",
+    } as const;
+    return (
+        <span className={`inline-flex items-center text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded-md border ${map[severity]}`}>
+            {severity}
+        </span>
+    );
+}
+
 function FooterLegend() {
     return (
         <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
             <p>
-                <strong>How to read this:</strong> run a toggle-based attack
-                script from the terminal (e.g.{" "}
-                <code className="font-mono text-[11px]">.\attacks\M11_webhook_no_signature\attack.ps1</code>).
-                The Sentinel sweeps every 30s and the alert feed streams events
-                in real time from Firestore. Flip the toggle in code, rerun the
-                script, and capture before/after pairs from the terminal output
-                plus this page.
+                <strong>How to read this:</strong> click <em>Run Attack</em>. The
+                page makes a real HTTP request to the targeted endpoint and shows
+                the exact response. <span className="text-rose-500 font-semibold">VULNERABILITY EXPLOITED</span> means the
+                attack succeeded; <span className="text-emerald-600 font-semibold">ATTACK BLOCKED</span> means the protection
+                module caught it. Successful exploits are <strong>auto-cleaned</strong> and
+                logged to the alerts feed below. Toggle a protection on/off in
+                code, then re-run here to capture before/after screenshots.
             </p>
         </div>
     );

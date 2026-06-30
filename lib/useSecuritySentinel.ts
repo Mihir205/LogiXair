@@ -34,16 +34,6 @@ export type MqttIncidentBucket = {
     latest_iso: string | null;
 };
 
-export type IdsAlert = {
-    rule_id: string;
-    rule_kind: "rate" | "pattern" | "trend";
-    severity: "critical" | "high" | "medium";
-    message: string;
-    count?: number;
-    metric?: Record<string, unknown>;
-    detected_at: string;
-};
-
 export type SentinelReport = {
     scannedUsers: number;
     deleted: SentinelDeletion[];
@@ -53,8 +43,6 @@ export type SentinelReport = {
     jammingThresholdSec: number;
     mqttIncidents: MqttIncidentBucket[];
     mqttIncidentWindowSec: number;
-    idsAlertsFiredThisSweep: IdsAlert[];
-    idsAlertsRecent: IdsAlert[];
     durationMs: number;
     runAt: Date;
 };
