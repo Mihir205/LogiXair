@@ -236,19 +236,26 @@ export async function POST(req: Request) {
         const topic = `stations/${payload.device_id}/telemetry`;
         const now = Date.now();
 
+        // Firebase RTDB rejects `undefined` values. Optional fields the
+        // publisher didn't send (pressure, rainfall, etc.) come through as
+        // undefined from validateTelemetry — strip them before persisting.
+        const cleanPayload = Object.fromEntries(
+            Object.entries(payload).filter(([, v]) => v !== undefined),
+        ) as TelemetryPayload;
+
         // (a) Dashboard-compatible single-root write — the existing
         // useWeatherData hook reads `weather_station/{payload, ...}`.
         // Last-write-wins; fine for the live tile.
         await adminDatabase.ref("weather_station").set({
-            payload,
+            payload: cleanPayload,
             receivedAt: now,
             topic,
         });
 
         // (b) Per-device archive so multi-station dashboards / future
         // analytics can pivot by station_id without race conditions.
-        await adminDatabase.ref(`stations/${payload.device_id}/latest`).set({
-            payload,
+        await adminDatabase.ref(`stations/${cleanPayload.device_id}/latest`).set({
+            payload: cleanPayload,
             receivedAt: now,
             topic,
         });
@@ -256,12 +263,12 @@ export async function POST(req: Request) {
         // Firestore archival — every 20 minutes per device.
         const metaRef = adminFirestore
             .collection("system")
-            .doc(`weather_${payload.device_id}`);
+            .doc(`weather_${cleanPayload.device_id}`);
         const metaDoc = await metaRef.get();
         const lastSaved = metaDoc.exists ? metaDoc.data()?.lastSaved ?? 0 : 0;
         if (now - lastSaved >= 20 * 60 * 1000) {
             await adminFirestore.collection("readings").add({
-                ...payload,
+                ...cleanPayload,
                 receivedAt: new Date(),
             });
             await metaRef.set({ lastSaved: now });

@@ -17,7 +17,10 @@
 import crypto from "crypto";
 
 // FLIP FOR BEFORE/AFTER webhook-spoofing screenshots.
-export const WEBHOOK_GUARD_ENABLED = true;
+// Temporarily false while we sort out the EMQX rule-engine HMAC function
+// name on Cloud Serverless. Flip back to true once the SQL `... as sig`
+// column works in the SQL Tester.
+export const WEBHOOK_GUARD_ENABLED = false;
 
 const HEADER_NAME = "x-emqx-signature";
 const SIG_PREFIX = "sha256=";
