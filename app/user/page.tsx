@@ -23,6 +23,17 @@ export default function UserPage() {
   const weather = useWeatherData();
   const [formattedDate, setFormattedDate] = useState("--");
   const [formattedTime, setFormattedTime] = useState("--");
+  // Tick once per second so the "Station Connected" pill flips to disconnected
+  // by itself when no new telemetry has arrived for STATION_STALE_MS.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const STATION_STALE_MS = 60_000;
+  const isStationOnline =
+    typeof weather?.receivedAt === "number" &&
+    now - weather.receivedAt < STATION_STALE_MS;
 
   useEffect(() => {
     // Use receivedAt (Firebase write time, real Unix ms) — NOT payload.timestamp
@@ -78,13 +89,24 @@ export default function UserPage() {
                 </p>
               </div>
 
-              {/* Simple Network Connection Pill */}
+              {/* Live Station Connection Pill — driven by weather.receivedAt */}
               <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors duration-200">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300">Station Connected</span>
+                {isStationOnline ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-semibold tracking-wide text-emerald-700 dark:text-emerald-400">Station Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                    </span>
+                    <span className="text-xs font-semibold tracking-wide text-rose-700 dark:text-rose-400">Station Not Connected</span>
+                  </>
+                )}
               </div>
             </div>
 
