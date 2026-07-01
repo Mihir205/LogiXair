@@ -33,14 +33,14 @@ const CLICKJACK_PROTECTION = true;
 
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.firebaseio.com https://*.firebasedatabase.app https://*.googleapis.com https://www.gstatic.com`,
+  `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.firebaseio.com https://*.firebasedatabase.app https://*.googleapis.com https://apis.google.com https://www.gstatic.com https://www.google.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
   "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
   // frame-src: what WE are allowed to embed (Google Maps iframe on /common/map).
   // Different from frame-ancestors (who can embed US — set on the line below).
-  "frame-src https://www.google.com https://maps.google.com https://*.google.com",
+  "frame-src https://www.google.com https://maps.google.com https://*.google.com https://apis.google.com https://accounts.google.com https://*.firebaseapp.com",
   CLICKJACK_PROTECTION ? "frame-ancestors 'none'" : "frame-ancestors *",
   "object-src 'none'",
   "base-uri 'self'",
