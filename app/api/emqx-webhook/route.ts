@@ -49,7 +49,14 @@ type TelemetryPayload = {
     pressure?: number;
     rainfall?: number;
     wind_speed?: number;
+    wind_avg_ms?: number;
+    wind_max_ms?: number;
+    wind_direction?: number;
     light_intensity?: number;
+    battery?: string;
+    rssi?: number;
+    station_id?: string;
+    sensor_id?: number;
     timestamp?: number;
     nonce?: number;
 };
@@ -93,15 +100,28 @@ function validateTelemetry(raw: unknown):
         return out.v;
     };
 
+    // Bresser 5-in-1 stations send wind_direction under either name, and
+    // rainfall/wind_speed under their Bresser-native aliases too — accept
+    // whichever the publisher used.
+    const windDirectionRaw = r.wind_direction ?? r.wind_dir;
+    const rainfallRaw = r.rainfall ?? r.rain;
+
     try {
         const data: TelemetryPayload = {
             device_id: r.device_id,
             temperature: t.v,
             humidity: h.v,
             pressure: optional(r.pressure, 800, 1200, "pressure"),
-            rainfall: optional(r.rainfall, 0, 500, "rainfall"),
+            rainfall: optional(rainfallRaw, 0, 500, "rainfall"),
             wind_speed: optional(r.wind_speed, 0, 100, "wind_speed"),
+            wind_avg_ms: optional(r.wind_avg_ms, 0, 100, "wind_avg_ms"),
+            wind_max_ms: optional(r.wind_max_ms, 0, 100, "wind_max_ms"),
+            wind_direction: optional(windDirectionRaw, 0, 360, "wind_direction"),
             light_intensity: optional(r.light_intensity, 0, 200000, "light_intensity"),
+            battery: typeof r.battery === "string" ? r.battery : undefined,
+            rssi: optional(r.rssi, -150, 0, "rssi"),
+            station_id: typeof r.station_id === "string" ? r.station_id : undefined,
+            sensor_id: typeof r.sensor_id === "number" ? r.sensor_id : undefined,
             timestamp: typeof r.timestamp === "number" ? r.timestamp : undefined,
             nonce: typeof r.nonce === "number" ? r.nonce : undefined,
         };
