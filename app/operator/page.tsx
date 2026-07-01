@@ -2,6 +2,8 @@
 import RouteGuard from "../components/RouteGuard";
 import AuthGuard from "../components/AuthGuard";
 import DashboardLayout from "../components/DashboardLayout";
+import ModelCharts from "../components/ModelCharts";
+import useWeatherData from "../../lib/useWeatherData";
 import {
   Activity,
   Radio,
@@ -18,7 +20,11 @@ import {
   Info,
 } from "lucide-react";
 
+const fmt = (v: number | undefined, unit: string, digits = 1) =>
+  v === undefined || v === null || Number.isNaN(v) ? "—" : `${v.toFixed(digits)}${unit}`;
+
 export default function OperatorPage() {
+  const w = useWeatherData();
   return (
     <AuthGuard>
       <RouteGuard allowedRole="operator">
@@ -72,30 +78,30 @@ export default function OperatorPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
               <MetricCard
                 title="Core Temperature"
-                value="27°C"
-                trend="Station optimal"
-                trendType="positive"
+                value={fmt(w?.temperature, "°C")}
+                trend={w ? "Live Bresser feed" : "Awaiting feed"}
+                trendType={w?.temperature !== undefined ? "positive" : "neutral"}
                 icon={<Thermometer size={16} className="text-slate-600 dark:text-slate-400" />}
               />
               <MetricCard
                 title="Coupling Humidity"
-                value="65%"
+                value={fmt(w?.humidity, "%", 0)}
                 trend="Rel. Humidity"
                 trendType="neutral"
                 icon={<Droplets size={16} className="text-slate-600 dark:text-slate-400" />}
               />
               <MetricCard
                 title="Air Velocity"
-                value="6 km/h"
-                trend="Light airflow"
+                value={fmt(w?.wind_speed, " m/s")}
+                trend={w?.wind_direction !== undefined ? `${w.wind_direction.toFixed(0)}° dir` : "Light airflow"}
                 trendType="neutral"
                 icon={<Wind size={16} className="text-slate-600 dark:text-slate-400" />}
               />
               <MetricCard
-                title="Active Components"
-                value="12"
-                trend="Hardware diagnostic"
-                trendType="positive"
+                title="Signal Strength"
+                value={w?.rssi !== undefined ? `${w.rssi} dBm` : "—"}
+                trend={w?.battery ? `Battery ${w.battery}` : "Hardware diagnostic"}
+                trendType={w?.battery === "OK" ? "positive" : "neutral"}
                 icon={<Cpu size={16} className="text-slate-600 dark:text-slate-400" />}
               />
             </div>
@@ -120,9 +126,9 @@ export default function OperatorPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <SensorRow label="Pressure Sensor Node" value="907 hPa" icon={<Gauge size={14} className="text-slate-500 dark:text-slate-400" />} />
-                    <SensorRow label="Rainfall Trigger" value="1 mm" icon={<CloudRain size={14} className="text-slate-500 dark:text-slate-400" />} />
-                    <SensorRow label="Irradiance Sensor" value="1 W/m²" icon={<Sun size={14} className="text-slate-500 dark:text-slate-400" />} />
+                    <SensorRow label="Pressure Sensor Node" value={fmt(w?.pressure, " hPa", 0)} icon={<Gauge size={14} className="text-slate-500 dark:text-slate-400" />} />
+                    <SensorRow label="Rainfall Trigger" value={fmt(w?.rain, " mm")} icon={<CloudRain size={14} className="text-slate-500 dark:text-slate-400" />} />
+                    <SensorRow label="Irradiance Sensor" value={fmt(w?.irradiance, " W/m²", 0)} icon={<Sun size={14} className="text-slate-500 dark:text-slate-400" />} />
                   </div>
                 </div>
               </div>
@@ -167,6 +173,11 @@ export default function OperatorPage() {
 
               </div>
 
+            </div>
+
+            {/* ML MODEL ANALYTICS */}
+            <div className="pt-4">
+              <ModelCharts />
             </div>
           </div>
         </DashboardLayout>
