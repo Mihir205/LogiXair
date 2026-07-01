@@ -53,6 +53,8 @@ type TelemetryPayload = {
     wind_max_ms?: number;
     wind_direction?: number;
     light_intensity?: number;
+    irradiance?: number;
+    panel_current_a?: number;
     battery?: string;
     rssi?: number;
     station_id?: string;
@@ -118,6 +120,8 @@ function validateTelemetry(raw: unknown):
             wind_max_ms: optional(r.wind_max_ms, 0, 100, "wind_max_ms"),
             wind_direction: optional(windDirectionRaw, 0, 360, "wind_direction"),
             light_intensity: optional(r.light_intensity, 0, 200000, "light_intensity"),
+            irradiance: optional(r.irradiance, 0, 1500, "irradiance"),
+            panel_current_a: optional(r.panel_current_a, -20, 20, "panel_current_a"),
             battery: typeof r.battery === "string" ? r.battery : undefined,
             rssi: optional(r.rssi, -150, 0, "rssi"),
             station_id: typeof r.station_id === "string" ? r.station_id : undefined,
