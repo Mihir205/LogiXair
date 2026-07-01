@@ -205,10 +205,49 @@ export async function POST(req: Request) {
     try {
         parsed = JSON.parse(rawBody);
     } catch {
+        // Log the raw body so we can see WHY parsing failed.
+        try {
+            await adminDatabase.ref("webhook_debug/latest").set({
+                receivedAt: Date.now(),
+                stage: "json_parse_failed",
+                rawBodyPreview: rawBody.slice(0, 500),
+            });
+        } catch { /* debug logging is best-effort */ }
         return NextResponse.json(
             { success: false, error: "Bad request." },
             { status: 400 },
         );
+    }
+
+    // Debug: log EVERY incoming body so we can see exactly what EMQX sends.
+    // Overwrites the same key so we don't flood RTDB — just a peephole.
+    try {
+        await adminDatabase.ref("webhook_debug/latest").set({
+            receivedAt: Date.now(),
+            stage: "parsed",
+            bodyPreview: JSON.stringify(parsed).slice(0, 500),
+            hasDeviceId: typeof (parsed as any)?.device_id === "string",
+            hasPayloadField: typeof (parsed as any)?.payload !== "undefined",
+        });
+    } catch { /* debug logging is best-effort */ }
+
+    // EMQX rule engine may wrap the MQTT payload in a SELECT result like
+    // { payload: "<json-string>", topic: "...", clientid: "...", ... } when
+    // the rule SQL is `SELECT payload, topic, ... FROM ...`. Detect this
+    // pattern and unwrap so the validator sees the actual sensor JSON.
+    if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        !(parsed as any).device_id
+    ) {
+        const outer = parsed as Record<string, unknown>;
+        if (typeof outer.payload === "string") {
+            try {
+                parsed = JSON.parse(outer.payload);
+            } catch { /* keep original if not JSON */ }
+        } else if (typeof outer.payload === "object" && outer.payload !== null) {
+            parsed = outer.payload;
+        }
     }
 
     // ── 3.5. Retained-message reject (M5 defense) ───────────────────
@@ -245,9 +284,15 @@ export async function POST(req: Request) {
                 summary: `EMQX webhook rejected: ${validation.reason}`,
                 target: { route: "/api/emqx-webhook" },
             });
-        } catch {
-            /* logging must not block the response */
-        }
+        } catch { /* logging must not block the response */ }
+        // Also stash the exact rejection reason in RTDB for quick inspection.
+        try {
+            await adminDatabase.ref("webhook_debug/latest_rejection").set({
+                receivedAt: Date.now(),
+                reason: validation.reason,
+                bodyPreview: JSON.stringify(parsed).slice(0, 500),
+            });
+        } catch { /* debug logging is best-effort */ }
         return NextResponse.json(
             { success: false, error: "Bad request." },
             { status: 400 },
