@@ -61,6 +61,14 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=31536000; includeSubDomains",
   },
+  // Isolate our browsing context from cross-origin windows (Spectre-class /
+  // tab-nabbing defense). allow-popups keeps Firebase/OAuth popups working.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  // Stop other sites from loading our resources cross-origin.
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  // No Adobe/Flash cross-domain policy files honored.
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
 ];
 
 const nextConfig: NextConfig = {

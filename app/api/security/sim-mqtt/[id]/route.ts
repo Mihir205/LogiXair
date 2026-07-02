@@ -18,6 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { logSecurityEvent } from "@/lib/security/logSecurityEvent";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 import {
     logAnonConnectAttempt,
     logCrossStationPublishAttempt,
@@ -38,6 +39,11 @@ export async function POST(
     req: Request,
     ctx: { params: Promise<{ id: string }> },
 ) {
+    // Admin-only: this simulation writes security_events + attempt logs.
+    // Left public it could be spammed to forge events / burn Firestore quota.
+    const guard = await requireAdmin(req);
+    if ("error" in guard) return guard.error;
+
     const { id } = await ctx.params;
     let body: Record<string, unknown> = {};
     try {
