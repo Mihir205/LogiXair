@@ -14,6 +14,8 @@
 
     "model_metrics":          { ".read": "auth != null", ".write": false },
     "live_readings":          { ".read": "auth != null", ".write": false },
+    "sensor_history":         { ".read": "auth != null", ".write": false },
+    "hourly_trend":           { ".read": "auth != null", ".write": false },
     "predictions_all_models": { ".read": "auth != null", ".write": false },
     "validation_history":     { ".read": "auth != null", ".write": false },
     "prediction":             { ".read": "auth != null", ".write": false },

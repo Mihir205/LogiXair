@@ -52,6 +52,32 @@ import {
 
 const COLORS = ["#4f46e5", "#cbd5e1", "#f59e0b", "#ef4444"];
 
+const DAILY_PARAMS = [
+  { key: "temperature", label: "Temperature", unit: "°C" },
+  { key: "humidity", label: "Humidity", unit: "%" },
+  { key: "pressure", label: "Pressure", unit: "hPa" },
+] as const;
+
+const PRED_PARAMS = [
+  { key: "temperature", label: "Temperature", unit: "°C", pred: "temperature" },
+  { key: "humidity", label: "Humidity", unit: "%", pred: "humidity" },
+  { key: "wind_speed", label: "Wind Speed", unit: "m/s", pred: "wind_speed" },
+  { key: "rain", label: "Rainfall", unit: "mm", pred: "rainfall" },
+  { key: "irradiance", label: "Irradiance", unit: "W/m²", pred: "irradiance" },
+] as const;
+
+// Recharts numeric domain that hugs the data so one big value (pressure,
+// irradiance) doesn't flatten the others.
+function paddedDomain(values: number[]): [number, number] {
+  const nums = values.filter((v) => typeof v === "number" && !Number.isNaN(v));
+  if (!nums.length) return [0, 1];
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  if (min === max) return [Math.max(0, min - 1), max + 1];
+  const pad = (max - min) * 0.15;
+  return [Math.max(0, min - pad), max + pad];
+}
+
 export default function AnalyticsPage() {
   const analytics = useAnalyticsData();
   const liveReadings = useLiveReadings(96);   // 20-min nested store
@@ -59,6 +85,8 @@ export default function AnalyticsPage() {
   const liveNow = useWeatherData();
   const [trendKey, setTrendKey] = useState<(typeof TREND_PARAMS)[number]["key"]>("temperature");
   const [resolution, setResolution] = useState<"hourly" | "20min">("hourly");
+  const [dailyKey, setDailyKey] = useState<(typeof DAILY_PARAMS)[number]["key"]>("temperature");
+  const [predKey, setPredKey] = useState<(typeof PRED_PARAMS)[number]["key"]>("temperature");
   const { anomalies, analyzedPoints } = useAnomalies();
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -112,30 +140,27 @@ export default function AnalyticsPage() {
     },
   ];
 
+  // Daily metrics: Min / Avg / Max for the SELECTED parameter, so the axis
+  // fits one parameter instead of squashing temp/humidity under pressure.
+  const dailyParam = DAILY_PARAMS.find((p) => p.key === dailyKey)!;
   const dailyMetrics = [
-    {
-      metric: "Temperature",
-      value: analytics.daily?.avg_temperature || 0,
-    },
-    {
-      metric: "Humidity",
-      value: analytics.daily?.avg_humidity || 0,
-    },
-    {
-      metric: "Pressure",
-      value: analytics.daily?.avg_pressure || 0,
-    },
+    { metric: "Min", value: analytics.daily?.[`min_${dailyKey}`] ?? 0 },
+    { metric: "Avg", value: analytics.daily?.[`avg_${dailyKey}`] ?? 0 },
+    { metric: "Max", value: analytics.daily?.[`max_${dailyKey}`] ?? 0 },
   ];
+  const dailyDomain = paddedDomain(dailyMetrics.map((d) => d.value));
+
   // Actual = live Bresser payload; Predicted = SmartWeatherAI next-hour
   // forecast (prediction/next_hour, written every cycle by the pipeline).
   const nextHour = analytics.prediction?.next_hour ?? analytics.prediction?.next20min ?? {};
+  const predParam = PRED_PARAMS.find((p) => p.key === predKey)!;
+  const predActual = (liveNow as any)?.[predParam.key] ?? 0;
+  const predPredicted = (nextHour as any)?.[predParam.pred] ?? 0;
   const predictionData = [
-    { metric: "Temp °C",    actual: liveNow?.temperature ?? 0, predicted: nextHour.temperature ?? 0 },
-    { metric: "Humidity %", actual: liveNow?.humidity ?? 0,    predicted: nextHour.humidity ?? 0 },
-    { metric: "Wind m/s",   actual: liveNow?.wind_speed ?? 0,  predicted: nextHour.wind_speed ?? 0 },
-    { metric: "Rain mm",    actual: liveNow?.rain ?? 0,        predicted: nextHour.rainfall ?? 0 },
-    { metric: "Irrad W/m²", actual: liveNow?.irradiance ?? 0,  predicted: nextHour.irradiance ?? 0 },
+    { name: "Actual", value: Number(predActual) },
+    { name: "Predicted", value: Number(predPredicted) },
   ];
+  const predDomain = paddedDomain([predActual, predPredicted]);
 
   // Dynamic colors for internal Recharts engines
   const gridColor = mounted && theme === "dark" ? "#1e293b" : "#f1f5f9";
@@ -239,7 +264,7 @@ export default function AnalyticsPage() {
               <div className="h-80 w-full">
                 {hourlyData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-400">
-                    No hourly {trendParam.label.toLowerCase()} history yet — the pipeline logs one reading per hour.
+                    No {resolution === "hourly" ? "hourly" : "20-minute"} {trendParam.label.toLowerCase()} history yet — the pipeline logs one reading per {resolution === "hourly" ? "hour" : "20 min"}.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -309,58 +334,63 @@ export default function AnalyticsPage() {
 
               {/* HISTORICAL BAR AVERAGES */}
               <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Daily Weather Metrics</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aggregate values for tracking parameters.</p>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Daily {dailyParam.label} Metrics</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Min / average / max over today ({dailyParam.unit}).</p>
                   </div>
-                  <Activity size={15} className="text-slate-400 dark:text-slate-500" />
+                  <select
+                    value={dailyKey}
+                    onChange={(e) => setDailyKey(e.target.value as typeof dailyKey)}
+                    className="text-[11px] font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    {DAILY_PARAMS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </select>
                 </div>
 
                 <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dailyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <BarChart data={dailyMetrics} margin={{ top: 10, right: 10, left: -6, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                       <XAxis dataKey="metric" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={{ fill: mounted && theme === 'dark' ? '#1e293b' : '#f8fafc' }} contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
-                      <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
-                      <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={32} />
+                      <YAxis domain={dailyDomain} tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v.toFixed(0)} />
+                      <Tooltip cursor={{ fill: mounted && theme === 'dark' ? '#1e293b' : '#f8fafc' }} formatter={(v: any) => [`${Number(v).toFixed(1)} ${dailyParam.unit}`, dailyParam.label]} contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
+                      <Bar dataKey="value" name={dailyParam.label} fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={48} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm">
-              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5">
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                  Actual vs Predicted Weather
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  SmartWeatherAI next-hour forecast compared with the live Bresser reading.
-                </p>
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                    Actual vs Predicted — {predParam.label}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    SmartWeatherAI next-hour forecast vs the live Bresser reading ({predParam.unit}).
+                  </p>
+                </div>
+                <select
+                  value={predKey}
+                  onChange={(e) => setPredKey(e.target.value as typeof predKey)}
+                  className="text-[11px] font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  {PRED_PARAMS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                </select>
               </div>
 
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={predictionData}>
+                  <BarChart data={predictionData} margin={{ top: 10, right: 10, left: -6, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                    <XAxis dataKey="metric" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-
-                    <Bar
-                      dataKey="actual"
-                      fill="#4f46e5"
-                      name="Actual"
-                    />
-
-                    <Bar
-                      dataKey="predicted"
-                      fill="#06b6d4"
-                      name="Predicted"
-                    />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
+                    <YAxis domain={predDomain} tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v.toFixed(0)} />
+                    <Tooltip cursor={{ fill: mounted && theme === 'dark' ? '#1e293b' : '#f8fafc' }} formatter={(v: any) => [`${Number(v).toFixed(2)} ${predParam.unit}`, predParam.label]} contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}` }} />
+                    <Bar dataKey="value" name={predParam.label} radius={[4, 4, 0, 0]} barSize={80}>
+                      <Cell fill="#4f46e5" />
+                      <Cell fill="#06b6d4" />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>

@@ -177,9 +177,8 @@ function SecurityDemos() {
                         Cybersecurity Demos
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-                        Live attack/defense reproductions. Each card runs a real
-                        scripted exploit against this deployment, auto-cleans
-                        any rogue artifacts, and logs an alert to the feed.
+                        Continuous auto-defense monitoring and the live security
+                        event stream for this deployment.
                     </p>
                 </div>
                 <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -192,15 +191,7 @@ function SecurityDemos() {
 
             <SentinelStatus />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {ATTACKS.map((a) => (
-                    <AttackCard key={a.id} cfg={a} />
-                ))}
-            </div>
-
             <AlertsFeed />
-
-            <FooterLegend />
         </div>
     );
 }
