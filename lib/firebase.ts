@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase Web SDK config. These NEXT_PUBLIC_* values are injected at build
 // time and end up in the client bundle — by Firebase's design (the browser
@@ -24,6 +25,25 @@ const app =
   getApps().length === 0
     ? initializeApp(firebaseConfig)
     : getApps()[0];
+
+// App Check (reCAPTCHA v3) — proves requests come from OUR app, blocking
+// bots/scripts hitting Firebase directly. Browser-only (needs window), and
+// guarded so HMR / double-import can't double-initialize. Starts in Monitor
+// mode until each service is flipped to Enforce in the Firebase console.
+if (typeof window !== "undefined") {
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  if (siteKey && !(globalThis as any).__APP_CHECK_INIT__) {
+    try {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+      (globalThis as any).__APP_CHECK_INIT__ = true;
+    } catch {
+      /* already initialized — ignore */
+    }
+  }
+}
 
 export const auth = getAuth(app);
 
