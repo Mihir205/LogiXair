@@ -43,12 +43,19 @@ export async function POST(req: Request) {
       success: true,
     });
   } catch (err: any) {
+    // Map known Firebase Auth codes to safe, useful messages; never echo raw
+    // internal error text (may contain stack/config detail).
+    const code: string = err?.errorInfo?.code || err?.code || "";
+    const SAFE: Record<string, string> = {
+      "auth/email-already-exists": "That email is already registered.",
+      "auth/invalid-email": "Invalid email address.",
+      "auth/invalid-password": "Password must be at least 6 characters.",
+      "auth/weak-password": "Password is too weak.",
+    };
+    console.error("create-user error:", code || err?.message);
     return NextResponse.json(
-      {
-        success: false,
-        error: err.message,
-      },
-      { status: 500 }
+      { success: false, error: SAFE[code] ?? "Could not create user." },
+      { status: 400 },
     );
   }
 }

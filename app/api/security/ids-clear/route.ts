@@ -27,8 +27,9 @@ export async function POST(req: Request) {
         }
         return NextResponse.json({ success: true, deleted });
     } catch (e) {
+        console.error("ids-clear error:", e instanceof Error ? e.message : e);
         return NextResponse.json(
-            { success: false, error: e instanceof Error ? e.message : "unknown", deleted },
+            { success: false, error: "Could not clear IDS log.", deleted },
             { status: 500 },
         );
     }
