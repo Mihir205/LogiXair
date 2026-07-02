@@ -37,7 +37,11 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+  // *.firebasedatabase.app = regional RTDB (this project is on
+  // asia-southeast1.firebasedatabase.app, not firebaseio.com) over https+wss.
+  // nominatim = geocode proxy fallback. Missing any of these = silent
+  // connection failures in production.
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://nominatim.openstreetmap.org",
   // frame-src: what WE are allowed to embed (Google Maps iframe on /common/map).
   // Different from frame-ancestors (who can embed US — set on the line below).
   "frame-src https://www.google.com https://maps.google.com https://*.google.com https://apis.google.com https://accounts.google.com https://*.firebaseapp.com https://*.firebasedatabase.app",
