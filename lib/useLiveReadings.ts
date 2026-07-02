@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ref, onValue, query, limitToLast } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { db } from "./firebase";
 
 export type HourlyReading = {
-  hourKey: string;          // "2026-07-02T13"
-  label: string;            // "13:00"
+  hourKey: string;          // "2026-07-02 14:20"
+  label: string;            // "14:20"
+  date: string;             // "2026-07-02"
   temperature?: number;
   humidity?: number;
   wind_speed?: number;
@@ -17,34 +18,40 @@ export type HourlyReading = {
 };
 
 /**
- * Hourly sensor buckets written by the SmartWeatherAI pipeline to
- * /live_readings/{YYYY-MM-DDTHH} — one clean reading per hour with
- * all 7 Bresser parameters.
+ * Reads the nested sensor_history/{date}/{time} store written by the
+ * SmartWeatherAI pipeline every 20 min, and flattens it to a time-ordered
+ * array for the analytics trend chart.
  */
-export default function useLiveReadings(hours = 48): HourlyReading[] {
+export default function useLiveReadings(maxPoints = 200): HourlyReading[] {
   const [readings, setReadings] = useState<HourlyReading[]>([]);
 
   useEffect(() => {
-    const readingsRef = query(ref(db, "live_readings"), limitToLast(hours));
+    const readingsRef = ref(db, "sensor_history");
 
     const unsub = onValue(readingsRef, (snap) => {
-      const data = snap.val();
-      if (!data) {
+      const tree = snap.val();
+      if (!tree) {
         setReadings([]);
         return;
       }
-      const rows: HourlyReading[] = Object.entries(data)
-        .map(([hourKey, v]: [string, any]) => ({
-          hourKey,
-          label: `${hourKey.slice(11, 13)}:00`,
-          ...v,
-        }))
-        .sort((a, b) => a.hourKey.localeCompare(b.hourKey));
-      setReadings(rows);
+      const rows: HourlyReading[] = [];
+      for (const date of Object.keys(tree)) {
+        const times = tree[date] ?? {};
+        for (const time of Object.keys(times)) {
+          rows.push({
+            hourKey: `${date} ${time}`,
+            label: time,
+            date,
+            ...times[time],
+          });
+        }
+      }
+      rows.sort((a, b) => a.hourKey.localeCompare(b.hourKey));
+      setReadings(rows.slice(-maxPoints));
     });
 
     return () => unsub();
-  }, [hours]);
+  }, [maxPoints]);
 
   return readings;
 }
