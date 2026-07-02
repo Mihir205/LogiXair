@@ -19,6 +19,9 @@ import { rateLimit } from "./lib/security/rateLimit";
 // chatty station is never throttled; auth-sensitive writes are tight.
 const LIMITS: { test: (p: string) => boolean; limit: number; cls: string }[] = [
   { cls: "ingest", limit: 240, test: (p) => p.startsWith("/api/emqx-webhook") || p.startsWith("/api/sensors/ingest") || p.startsWith("/api/weather-ingest") },
+  // Auth/lockout is pre-session; keep it tight to blunt credential stuffing
+  // (the lockout itself trips at 5, so 30/min/IP is generous headroom).
+  { cls: "auth", limit: 30, test: (p) => p.startsWith("/api/auth/") },
   { cls: "adminwrite", limit: 30, test: (p) => p.startsWith("/api/admin/") || p.startsWith("/api/station-config") || p.startsWith("/api/security/") },
   { cls: "geocode", limit: 40, test: (p) => p.startsWith("/api/geocode") },
 ];

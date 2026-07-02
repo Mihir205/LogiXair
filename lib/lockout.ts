@@ -1,23 +1,11 @@
 /**
- * Client-side brute-force lockout helper for the LogiXair Firebase build.
+ * Brute-force lockout — client shim over the server-enforced counter.
  *
- * Mirrors the FastAPI backend behaviour (5 wrong attempts -> 15 min lock,
- * auto-unlock when timer expires). Stored in Firestore so the Admin Security
- * Center can list every locked / at-risk account in real time.
- *
- * NOTE — this is enforced from the client. For a production deployment the
- * same logic should be moved into a Cloud Function (or Firestore security
- * rules) so a tampered client cannot bypass the counter. For the demo this
- * matches the threat model used by the rest of the cybersecurity section.
+ * The actual counter lives in /api/auth/lockout (Admin SDK), so a tampered
+ * browser can no longer skip a failure or clear its own lock. These helpers
+ * keep the SAME signatures the login page already imports, so nothing at the
+ * call site changed. Firestore rules now deny client writes to loginAttempts.
  */
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  Timestamp,
-} from "firebase/firestore";
-import { firestore } from "./firebase";
 
 export const MAX_ATTEMPTS = 5;
 export const LOCKOUT_MINUTES = 15;
@@ -31,66 +19,49 @@ export interface LockoutStatus {
   lock_seconds_remaining: number;
 }
 
-function keyFor(email: string) {
-  return email.trim().toLowerCase();
-}
+const NOT_LOCKED = (email: string): LockoutStatus => ({
+  email: email.trim().toLowerCase(),
+  failed_attempts: 0,
+  attempts_remaining: MAX_ATTEMPTS,
+  max_attempts: MAX_ATTEMPTS,
+  is_locked: false,
+  lock_seconds_remaining: 0,
+});
 
-function secondsUntil(ts: Timestamp | null | undefined): number {
-  if (!ts) return 0;
-  const ms = ts.toMillis() - Date.now();
-  return Math.max(0, Math.floor(ms / 1000));
+async function call(action: "check" | "fail" | "reset", email: string): Promise<any> {
+  const res = await fetch("/api/auth/lockout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, email }),
+  });
+  return res.json();
 }
 
 export async function readLockout(email: string): Promise<LockoutStatus> {
-  const id = keyFor(email);
-  const ref = doc(firestore, "loginAttempts", id);
-  const snap = await getDoc(ref);
-  const data = snap.exists() ? snap.data() : null;
-  const failed = (data?.failed_attempts as number) ?? 0;
-  const lockedUntil = (data?.locked_until as Timestamp | null) ?? null;
-  const remaining = secondsUntil(lockedUntil);
-  return {
-    email: id,
-    failed_attempts: failed,
-    attempts_remaining: Math.max(0, MAX_ATTEMPTS - failed),
-    max_attempts: MAX_ATTEMPTS,
-    is_locked: remaining > 0,
-    lock_seconds_remaining: remaining,
-  };
+  try {
+    const data = await call("check", email);
+    return data?.email ? data : NOT_LOCKED(email);
+  } catch {
+    // Fail open on a network hiccup so a real user is never wedged out.
+    return NOT_LOCKED(email);
+  }
 }
 
 export async function recordFailure(email: string): Promise<LockoutStatus> {
-  const id = keyFor(email);
-  const ref = doc(firestore, "loginAttempts", id);
-  const snap = await getDoc(ref);
-  const prev = snap.exists() ? snap.data() : {};
-  const attempts = ((prev?.failed_attempts as number) ?? 0) + 1;
-  const patch: Record<string, unknown> = {
-    email: id,
-    failed_attempts: attempts,
-    updated_at: serverTimestamp(),
-  };
-  if (attempts >= MAX_ATTEMPTS) {
-    patch.locked_until = Timestamp.fromMillis(
-      Date.now() + LOCKOUT_MINUTES * 60 * 1000
-    );
+  try {
+    const data = await call("fail", email);
+    return data?.email ? data : NOT_LOCKED(email);
+  } catch {
+    return NOT_LOCKED(email);
   }
-  await setDoc(ref, patch, { merge: true });
-  return readLockout(email);
 }
 
 export async function resetLockout(email: string): Promise<void> {
-  const id = keyFor(email);
-  await setDoc(
-    doc(firestore, "loginAttempts", id),
-    {
-      email: id,
-      failed_attempts: 0,
-      locked_until: null,
-      updated_at: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  try {
+    await call("reset", email);
+  } catch {
+    /* non-fatal */
+  }
 }
 
 export function formatRemaining(seconds: number): string {
