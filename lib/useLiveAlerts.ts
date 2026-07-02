@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import useAlerts from "./useAlerts";
 import useWeatherData from "./useWeatherData";
+import useAnomalies from "./useAnomalies";
 
 export type LiveAlert = {
   id: string;
@@ -36,6 +37,7 @@ export default function useLiveAlerts(): {
 } {
   const stored = useAlerts();
   const w = useWeatherData();
+  const { anomalies } = useAnomalies();
 
   const derived = useMemo<LiveAlert[]>(() => {
     if (!w) return [];
@@ -87,6 +89,20 @@ export default function useLiveAlerts(): {
     return out;
   }, [w]);
 
+  // Statistical anomalies become alerts too (severe → critical).
+  const anomalyList: LiveAlert[] = useMemo(
+    () =>
+      anomalies.map((a) => ({
+        id: `anomaly-${a.parameter}`,
+        message: `${a.label} anomaly: ${a.value}${a.unit} (${Math.abs(a.z)}σ ${a.direction} vs baseline ≈ ${a.mean}${a.unit})`,
+        type: a.severity === "severe" ? ("critical" as const) : ("warning" as const),
+        source: "threshold" as const,
+        timestamp: Date.now(),
+        status: true,
+      })),
+    [anomalies],
+  );
+
   const storedList: LiveAlert[] = stored
     ? Object.entries(stored)
         .filter(([, a]: [string, any]) => a?.status)
@@ -100,6 +116,6 @@ export default function useLiveAlerts(): {
         }))
     : [];
 
-  const alerts = [...derived, ...storedList];
+  const alerts = [...derived, ...anomalyList, ...storedList];
   return { alerts, activeCount: alerts.length };
 }

@@ -3,6 +3,7 @@
 import useAnalyticsData from "../../../lib/useAnalyticsData";
 import useLiveReadings from "../../../lib/useLiveReadings";
 import useHourlyTrend from "../../../lib/useHourlyTrend";
+import useAnomalies from "../../../lib/useAnomalies";
 import useWeatherData from "../../../lib/useWeatherData";
 import DashboardLayout from "../../components/DashboardLayout";
 import { useTheme } from "next-themes";
@@ -58,6 +59,7 @@ export default function AnalyticsPage() {
   const liveNow = useWeatherData();
   const [trendKey, setTrendKey] = useState<(typeof TREND_PARAMS)[number]["key"]>("temperature");
   const [resolution, setResolution] = useState<"hourly" | "20min">("hourly");
+  const { anomalies, analyzedPoints } = useAnomalies();
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { role, loading } = useUserRole();
@@ -413,24 +415,54 @@ export default function AnalyticsPage() {
                 <ShieldAlert size={15} className="text-slate-400 dark:text-slate-500" />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/60">
-                <div className="space-y-1">
+              {anomalies.length === 0 ? (
+                <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
                   <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                    <AlertTriangle size={15} className={analytics.anomalies?.temperature > 0 ? "text-amber-500" : "text-slate-400 dark:text-slate-500"} />
-                    <h4 className="text-sm font-bold">Temperature Deviations: <span className="font-extrabold text-slate-900 dark:text-white">{analytics.anomalies?.temperature ?? 0}</span></h4>
+                    <ShieldAlert size={15} className="text-emerald-500" />
+                    <h4 className="text-sm font-bold">
+                      {analyzedPoints < 8
+                        ? `Building baseline (${analyzedPoints} readings so far)…`
+                        : "No anomalies — all parameters within normal range"}
+                    </h4>
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-6">
-                    System sync marker: {analytics.anomalies?.last_updated ?? "No connection timestamp records"}
-                  </p>
+                  <span className="text-[10px] font-bold tracking-wider px-2.5 py-1 rounded border uppercase bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40">
+                    Status Nominal
+                  </span>
                 </div>
-
-                <span className={`text-[10px] font-bold tracking-wider px-2.5 py-1 rounded border uppercase self-start sm:self-auto ${analytics.anomalies?.temperature > 0
-                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40"
-                  : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40"
-                  }`}>
-                  {analytics.anomalies?.temperature > 0 ? "Attention Required" : "Status Nominal"}
-                </span>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  {anomalies.map((a) => (
+                    <div
+                      key={a.parameter}
+                      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg border ${
+                        a.severity === "severe"
+                          ? "bg-rose-50/50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40"
+                          : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                          <AlertTriangle size={15} className={a.severity === "severe" ? "text-rose-500" : "text-amber-500"} />
+                          <h4 className="text-sm font-bold">
+                            {a.label} {a.direction === "high" ? "spike" : "drop"}:{" "}
+                            <span className="font-extrabold text-slate-900 dark:text-white">{a.value}{a.unit}</span>
+                          </h4>
+                        </div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-6">
+                          Expected ≈ {a.mean}{a.unit} (±{a.std}); z-score {a.z} — {Math.abs(a.z)}σ from baseline.
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold tracking-wider px-2.5 py-1 rounded border uppercase self-start sm:self-auto ${
+                        a.severity === "severe"
+                          ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-900/40"
+                          : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40"
+                      }`}>
+                        {a.severity === "severe" ? "Severe" : "Attention"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>
