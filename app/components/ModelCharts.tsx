@@ -42,6 +42,16 @@ const MODEL_COLORS: Record<string, string> = {
 
 const fallbackColors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444"];
 
+type MetricKey = "test_r2" | "train_r2" | "mae" | "mse" | "rmse";
+
+const METRICS: { key: MetricKey; label: string; higherBetter: boolean; digits: number; blurb: string }[] = [
+  { key: "test_r2",  label: "Test R²",  higherBetter: true,  digits: 4, blurb: "fit to unseen data — closer to 1 is better" },
+  { key: "train_r2", label: "Train R²", higherBetter: true,  digits: 4, blurb: "fit to training data — watch the gap vs test" },
+  { key: "mae",      label: "MAE",      higherBetter: false, digits: 3, blurb: "mean absolute error — lower is better" },
+  { key: "mse",      label: "MSE",      higherBetter: false, digits: 2, blurb: "mean squared error — punishes big misses" },
+  { key: "rmse",     label: "RMSE",     higherBetter: false, digits: 3, blurb: "root mean squared error — lower is better" },
+];
+
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function ModelCharts() {
@@ -50,6 +60,7 @@ export default function ModelCharts() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [sensorKey, setSensorKey] = useState<keyof SensorReading>("temperature");
   const [drillHour, setDrillHour] = useState<ValidationEntry | null>(null);
+  const [metricKey, setMetricKey] = useState<MetricKey>("test_r2");
 
   const modelNames = metrics ? Object.keys(metrics.models) : [];
   const activeModel = selectedModel ?? metrics?.best ?? modelNames[0] ?? null;
@@ -57,14 +68,38 @@ export default function ModelCharts() {
     metrics && metrics.best ? metrics.models[metrics.best] : undefined;
   const sensor = SENSORS.find((s) => s.key === sensorKey)!;
 
-  const comparisonData = modelNames.map((name, i) => ({
-    name,
-    shortName: name.replace(" Regression", ""),
-    "Test R²": Number((metrics!.models[name].test_r2 ?? 0).toFixed(4)),
-    "Train R²": Number((metrics!.models[name].train_r2 ?? 0).toFixed(4)),
-    color: MODEL_COLORS[name] ?? fallbackColors[i % fallbackColors.length],
-    isBest: name === metrics?.best,
-  }));
+  const metric = METRICS.find((m) => m.key === metricKey)!;
+
+  const comparisonData = modelNames.map((name, i) => {
+    const m = metrics!.models[name];
+    return {
+      name,
+      shortName: name.replace(" Regression", ""),
+      value: Number((m[metricKey] ?? 0).toFixed(metric.digits)),
+      test_r2: m.test_r2,
+      train_r2: m.train_r2,
+      mae: m.mae,
+      mse: m.mse,
+      rmse: m.rmse,
+      color: MODEL_COLORS[name] ?? fallbackColors[i % fallbackColors.length],
+    };
+  });
+
+  // Winner for the SELECTED metric: highest for R², lowest for error metrics
+  const winnerName = comparisonData.length
+    ? [...comparisonData].sort((a, b) =>
+        metric.higherBetter ? b.value - a.value : a.value - b.value
+      )[0].name
+    : null;
+
+  // Auto-scaled Y domain so tiny differences between models stay visible
+  const values = comparisonData.map((d) => d.value);
+  const vMin = Math.min(...values);
+  const vMax = Math.max(...values);
+  const pad = Math.max((vMax - vMin) * 0.35, vMax * 0.002, 1e-6);
+  const yDomain: [number, number] = metric.higherBetter
+    ? [Math.max(0, vMin - pad), Math.min(1, vMax + pad)]
+    : [Math.max(0, vMin - pad), vMax + pad];
 
   const activeSamples = activeModel ? metrics?.models[activeModel]?.samples : undefined;
   const activeMetric = activeModel ? metrics?.models[activeModel] : undefined;
@@ -181,27 +216,46 @@ export default function ModelCharts() {
         </div>
       )}
 
-      {/* § 01 — MODEL COMPARISON BAR */}
+      {/* § 01 — MODEL COMPARISON BAR (metric selectable) */}
       <ChapterCard
         chapter="01"
         title="Head-to-head"
-        subtitle="Test R² by model — closer to 1 is a tighter fit to unseen data."
-        insight={insightForComparison(comparisonData)}
+        subtitle={`${metric.label} by model — ${metric.blurb}.`}
+        insight={insightForComparison(comparisonData, metric, winnerName)}
+        headerAside={
+          <select
+            value={metricKey}
+            onChange={(e) => setMetricKey(e.target.value as MetricKey)}
+            className="font-mono-data text-[11px] bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-slate-700 dark:text-slate-300 cursor-pointer"
+          >
+            {METRICS.map((m) => (
+              <option key={m.key} value={m.key}>{m.label}</option>
+            ))}
+          </select>
+        }
       >
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={comparisonData} margin={{ top: 20, right: 16, left: -8, bottom: 0 }}>
+            <BarChart data={comparisonData} margin={{ top: 20, right: 16, left: 4, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
               <XAxis dataKey="shortName" tick={{ fontSize: 11, fontFamily: "JetBrains Mono", fill: "currentColor" }} className="text-slate-500" axisLine={false} tickLine={false} />
-              <YAxis domain={[0.9, 1]} tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "currentColor" }} className="text-slate-400" axisLine={false} tickLine={false} width={40} />
+              <YAxis
+                domain={yDomain}
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "currentColor" }}
+                className="text-slate-400"
+                axisLine={false}
+                tickLine={false}
+                width={64}
+                tickFormatter={(v: number) => v.toFixed(metric.digits)}
+              />
               <Tooltip content={<EditorialTooltip />} />
-              <Bar dataKey="Test R²" radius={[6, 6, 0, 0]}>
+              <Bar dataKey="value" name={metric.label} radius={[6, 6, 0, 0]}>
                 {comparisonData.map((entry, i) => (
                   <Cell
                     key={i}
                     fill={entry.color}
-                    fillOpacity={entry.isBest ? 1 : 0.35}
-                    stroke={entry.isBest ? entry.color : "transparent"}
+                    fillOpacity={entry.name === winnerName ? 1 : 0.35}
+                    stroke={entry.name === winnerName ? entry.color : "transparent"}
                     strokeWidth={2}
                     cursor="pointer"
                     onClick={() => setSelectedModel(entry.name)}
@@ -211,9 +265,14 @@ export default function ModelCharts() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <p className="font-mono-data text-[10px] tracking-wide text-slate-400 mt-3 uppercase">
-          → click a bar to inspect that model in § 02
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="font-mono-data text-[10px] tracking-wide text-slate-400 uppercase">
+            → click a bar to inspect that model in § 02
+          </p>
+          <p className="font-mono-data text-[10px] tracking-wide uppercase text-emerald-600 dark:text-emerald-400">
+            {metric.higherBetter ? "▲ higher is better" : "▼ lower is better"}
+          </p>
+        </div>
       </ChapterCard>
 
       {/* § 02 — SCATTER */}
@@ -513,12 +572,31 @@ function narrateBest(name: string, m: ModelMetric): string {
   return `${r2Pct}% variance explained on unseen data. MAE ${mae}. Currently the operational forecast.`;
 }
 
-function insightForComparison(rows: any[]): string {
-  if (rows.length < 2) return "";
-  const sorted = [...rows].sort((a, b) => b["Test R²"] - a["Test R²"]);
-  const gap = (sorted[0]["Test R²"] - sorted[1]["Test R²"]).toFixed(4);
-  if (Number(gap) < 0.005) return `The top three are within ${gap} R² of each other — a photo finish. When the champions are this close, cadence of retraining matters more than the choice.`;
-  return `${sorted[0].name} leads by ${gap} R² over ${sorted[1].name}. A meaningful margin — the winner is not accidental.`;
+function insightForComparison(
+  rows: any[],
+  metric: { key: string; label: string; higherBetter: boolean; digits: number },
+  winnerName: string | null
+): string {
+  if (rows.length < 2 || !winnerName) return "";
+  const sorted = [...rows].sort((a, b) =>
+    metric.higherBetter ? b.value - a.value : a.value - b.value
+  );
+  const gap = Math.abs(sorted[0].value - sorted[1].value);
+  const gapStr = gap.toFixed(metric.digits);
+  const relative = sorted[1].value !== 0
+    ? ` (${((gap / Math.abs(sorted[1].value)) * 100).toFixed(1)}% ${metric.higherBetter ? "ahead of" : "below"} the runner-up)`
+    : "";
+
+  if (metric.key === "train_r2") {
+    const suspicious = sorted.find((r) => r.train_r2 > 0.999);
+    if (suspicious) {
+      return `${suspicious.name} scores a near-perfect train R² — check its test score before trusting it; perfect memory often means weak generalization.`;
+    }
+  }
+  if (gap < (metric.higherBetter ? 0.005 : sorted[1].value * 0.02)) {
+    return `On ${metric.label}, the field is separated by just ${gapStr} — a photo finish. When it's this close, retraining cadence matters more than model choice.`;
+  }
+  return `${sorted[0].name} takes ${metric.label} at ${sorted[0].value.toFixed(metric.digits)}${relative}. A meaningful margin — not an accident.`;
 }
 
 function insightForScatter(m?: ModelMetric): string {
