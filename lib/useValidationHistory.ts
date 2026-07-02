@@ -21,38 +21,84 @@ export type ValidationEntry = {
 };
 
 /**
- * Reads the nested validation_history/{date}/{time} store (actual vs each
- * model's forecast, written every 20 min) and flattens it to a time-ordered
- * array for the ML drill-down charts.
+ * Builds the actual-vs-predicted ledger by JOINING two nested stores:
+ *   predictions_all_models/{date}/{time}  — the 4-model forecast made ~1h
+ *                                            earlier, keyed to the slot it targets
+ *   sensor_history/{date}/{time}          — the reading that actually arrived
+ *
+ * A validation row exists for every target slot that has BOTH a forecast and
+ * a matching actual. Computing this client-side (rather than relying on the
+ * pipeline to write a separate validation_history node at the exact moment)
+ * means the ledger fills as soon as the data exists — robust to intermittent
+ * pipeline runs. Falls back to the pipeline's validation_history if present.
  */
 export default function useValidationHistory(limit = 100): ValidationEntry[] {
-  const [history, setHistory] = useState<ValidationEntry[]>([]);
+  const [preds, setPreds] = useState<any>(null);
+  const [actuals, setActuals] = useState<any>(null);
+  const [written, setWritten] = useState<any>(null);
+  const [predHist, setPredHist] = useState<any>(null);
 
   useEffect(() => {
-    const historyRef = ref(db, "validation_history");
-    const unsub = onValue(historyRef, (snap) => {
-      const tree = snap.val();
-      if (!tree) return setHistory([]);
+    const offP = onValue(ref(db, "predictions_all_models"), (s) => setPreds(s.val()));
+    const offA = onValue(ref(db, "sensor_history"), (s) => setActuals(s.val()));
+    const offW = onValue(ref(db, "validation_history"), (s) => setWritten(s.val()));
+    const offH = onValue(ref(db, "prediction_history"), (s) => setPredHist(s.val()));
+    return () => { offP(); offA(); offW(); offH(); };
+  }, []);
 
-      const entries: ValidationEntry[] = [];
-      for (const date of Object.keys(tree)) {
-        const times = tree[date] ?? {};
-        for (const time of Object.keys(times)) {
-          const rec = times[time];
-          if (rec?.actual && rec?.predictions) {
-            entries.push({
-              hour: rec.hour ?? `${date} ${time}`,
-              actual: rec.actual,
-              predictions: rec.predictions,
-            });
-          }
+  const entries: ValidationEntry[] = [];
+
+  // 1. Prefer any records the pipeline already wrote (nested date/time).
+  if (written) {
+    for (const date of Object.keys(written)) {
+      const times = written[date] ?? {};
+      for (const time of Object.keys(times)) {
+        const rec = times[time];
+        if (rec?.actual && rec?.predictions) {
+          entries.push({ hour: rec.hour ?? `${date} ${time}`, actual: rec.actual, predictions: rec.predictions });
         }
       }
-      entries.sort((a, b) => a.hour.localeCompare(b.hour));
-      setHistory(entries.slice(-limit));
-    });
-    return () => unsub();
-  }, [limit]);
+    }
+  }
 
-  return history;
+  // 2. Also join forecasts with the actuals that arrived at their target slot.
+  const seen = new Set(entries.map((e) => e.hour));
+  if (preds && actuals) {
+    for (const date of Object.keys(preds)) {
+      const slots = preds[date] ?? {};
+      for (const time of Object.keys(slots)) {
+        const key = `${date} ${time}`;
+        if (seen.has(key)) continue;
+        const forecast = slots[time]?.predictions;
+        const actual = actuals[date]?.[time];
+        if (forecast && actual) {
+          entries.push({ hour: key, actual, predictions: forecast });
+          seen.add(key);
+        }
+      }
+    }
+  }
+
+  // 3. Fallback so the ledger is never blank while true validation builds:
+  //    prediction_history has {actual, predicted(best model)} per slot, keyed
+  //    date/time — surfaced as a single "Forecast" model until the 4-model
+  //    validation records accumulate.
+  if (entries.length === 0 && predHist) {
+    for (const date of Object.keys(predHist)) {
+      const times = predHist[date] ?? {};
+      for (const time of Object.keys(times)) {
+        const rec = times[time];
+        if (rec?.actual && rec?.predicted) {
+          entries.push({
+            hour: `${date} ${time}`,
+            actual: rec.actual,
+            predictions: { Forecast: rec.predicted },
+          });
+        }
+      }
+    }
+  }
+
+  entries.sort((a, b) => a.hour.localeCompare(b.hour));
+  return entries.slice(-limit);
 }

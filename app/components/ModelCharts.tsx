@@ -351,7 +351,7 @@ export default function ModelCharts() {
             <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400">
               <TrendingUp size={28} className="text-slate-300 dark:text-slate-700" />
               <p className="font-editorial italic text-sm">The ledger hasn't opened yet.</p>
-              <p className="text-xs">First validation record lands next hour.</p>
+              <p className="text-xs">First actual-vs-predicted record lands ~20 min after the pipeline starts running.</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
