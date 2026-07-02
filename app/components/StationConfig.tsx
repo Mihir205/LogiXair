@@ -53,6 +53,39 @@ export default function StationConfig() {
     }
   };
 
+  // Reverse-geocode manually typed coordinates → auto-fill the place name
+  const resolvePlaceFromCoords = async () => {
+    const nlat = Number(lat);
+    const nlon = Number(lon);
+    if (Number.isNaN(nlat) || Number.isNaN(nlon)) return;
+    if (nlat < -90 || nlat > 90 || nlon < -180 || nlon > 180) return;
+    // Skip if coords haven't actually changed from the saved config
+    if (
+      current &&
+      Math.abs(nlat - current.latitude) < 1e-4 &&
+      Math.abs(nlon - current.longitude) < 1e-4
+    )
+      return;
+
+    setStatus("searching");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${nlat}&lon=${nlon}&format=json&zoom=10`
+      );
+      const data = await res.json();
+      if (data?.display_name) {
+        setPlace(data.display_name.split(",").slice(0, 2).join(","));
+      } else {
+        // Open ocean / unnamed area — still perfectly valid for NASA POWER
+        setPlace(`Unnamed area (${nlat.toFixed(2)}°, ${nlon.toFixed(2)}°)`);
+      }
+      setStatus("idle");
+    } catch {
+      // Geocoding failure shouldn't block saving — coords are what matter
+      setStatus("idle");
+    }
+  };
+
   const useMyLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation not supported in this browser.");
@@ -95,7 +128,20 @@ export default function StationConfig() {
     }
     setStatus("saving");
     try {
-      await updateStationConfig({ latitude: nlat, longitude: nlon, place: place || `${nlat},${nlon}` });
+      // If no place name yet, resolve one from the coords so the dashboard
+      // always shows what location the model is connected to.
+      let placeName = place.trim();
+      if (!placeName) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${nlat}&lon=${nlon}&format=json&zoom=10`
+          );
+          const data = await res.json();
+          placeName = data?.display_name?.split(",").slice(0, 2).join(",") ?? "";
+          if (placeName) setPlace(placeName);
+        } catch {}
+      }
+      await updateStationConfig({ latitude: nlat, longitude: nlon, place: placeName || `${nlat.toFixed(4)},${nlon.toFixed(4)}` });
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2500);
     } catch (e: any) {
@@ -156,6 +202,7 @@ export default function StationConfig() {
               <input
                 value={lat}
                 onChange={(e) => setLat(e.target.value)}
+                onBlur={resolvePlaceFromCoords}
                 className="mt-1 w-full px-3 py-2 text-sm font-mono-data rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                 placeholder="12.9716"
               />
@@ -165,6 +212,7 @@ export default function StationConfig() {
               <input
                 value={lon}
                 onChange={(e) => setLon(e.target.value)}
+                onBlur={resolvePlaceFromCoords}
                 className="mt-1 w-full px-3 py-2 text-sm font-mono-data rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                 placeholder="77.5946"
               />
