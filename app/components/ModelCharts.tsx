@@ -107,8 +107,11 @@ export default function ModelCharts() {
   const timeSeriesData = useMemo(
     () =>
       history.map((entry) => {
+        // entry.hour is "YYYY-MM-DD HH:MM" — show the real clock time (HH:MM),
+        // not the minute slice. Falls back to the raw value if unexpected.
+        const clock = entry.hour.split(/[ T]/)[1] ?? entry.hour;
         const point: Record<string, any> = {
-          time: entry.hour.slice(-2) + ":00",
+          time: clock,
           hour: entry.hour,
           _entry: entry,
           actual: entry.actual?.[sensorKey] ?? null,
@@ -318,7 +321,7 @@ export default function ModelCharts() {
       <ChapterCard
         chapter="03"
         title="The live ledger"
-        subtitle={`Actual vs predicted ${sensor.label.toLowerCase()}, hour by hour, from the Bresser feed.`}
+        subtitle={`Actual vs predicted ${sensor.label.toLowerCase()}, every 20 minutes, from the Bresser feed.`}
         insight={insightForTimeSeries(drift, timeSeriesData.length, sensor)}
         headerAside={
           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -426,9 +429,9 @@ function DrillModal({
       >
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
           <div>
-            <p className="font-mono-data text-[10px] tracking-[0.3em] uppercase text-slate-400">Hourly Ledger</p>
+            <p className="font-mono-data text-[10px] tracking-[0.3em] uppercase text-slate-400">Slot Ledger</p>
             <h4 className="font-editorial text-2xl font-light text-slate-900 dark:text-white">
-              {entry.hour.replace("T", " · ")}:00
+              {entry.hour.replace("T", " · ")}
             </h4>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
