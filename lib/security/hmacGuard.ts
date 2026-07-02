@@ -16,8 +16,11 @@
  */
 import crypto from "crypto";
 
-// FLIP FOR BEFORE/AFTER HMAC injection screenshots.
-export const HMAC_GUARD_ENABLED = false;
+// Enforced: LoRa frames to /api/sensors/ingest must carry a valid X-LoRa-MIC
+// (HMAC over the raw body with the device PSK). The live weather path is the
+// EMQX webhook, so this does not affect the Bresser feed — it hardens the
+// LoRa ingest endpoint against forged/injected frames.
+export const HMAC_GUARD_ENABLED = true;
 
 // Per-device PSK. The PSK is shared ONLY between the physical device
 // (programmed at provisioning time) and the backend. Never sent over the
