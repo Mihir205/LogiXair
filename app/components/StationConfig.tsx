@@ -1,11 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Search, Crosshair, CheckCircle2, Loader2 } from "lucide-react";
-import { useStationConfig, updateStationConfig } from "../../lib/useStationConfig";
+import { MapPin, Search, Crosshair, CheckCircle2, Loader2, Cog, AlertTriangle } from "lucide-react";
+import { useStationConfig, updateStationConfig, usePipelineStatus } from "../../lib/useStationConfig";
+
+const STATUS_UI: Record<string, { label: string; cls: string; spin?: boolean }> = {
+  idle:           { label: "Pipeline idle",        cls: "text-slate-500 dark:text-slate-400" },
+  training:       { label: "Training on NASA data…", cls: "text-indigo-600 dark:text-indigo-400", spin: true },
+  running:        { label: "Prediction cycle running…", cls: "text-emerald-600 dark:text-emerald-400", spin: true },
+  no_sensor_data: { label: "Bresser feed silent",   cls: "text-amber-600 dark:text-amber-400" },
+  error:          { label: "Pipeline error",        cls: "text-rose-600 dark:text-rose-400" },
+};
 
 export default function StationConfig() {
   const current = useStationConfig();
+  const pipeline = usePipelineStatus();
   const [place, setPlace] = useState("");
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
@@ -184,6 +193,14 @@ export default function StationConfig() {
               <p className="font-mono-data text-xs text-slate-500 mt-0.5">
                 {current.latitude.toFixed(4)}°, {current.longitude.toFixed(4)}°
               </p>
+            </div>
+          )}
+          {pipeline && STATUS_UI[pipeline.state] && (
+            <div className={"inline-flex items-center gap-1.5 justify-end font-mono-data text-[10px] tracking-widest uppercase " + STATUS_UI[pipeline.state].cls}>
+              {pipeline.state === "error" || pipeline.state === "no_sensor_data"
+                ? <AlertTriangle size={12} />
+                : <Cog size={12} className={STATUS_UI[pipeline.state].spin ? "animate-spin" : ""} />}
+              {STATUS_UI[pipeline.state].label}
             </div>
           )}
           <button

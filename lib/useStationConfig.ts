@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ref, onValue, set as fbSet } from "firebase/database";
-import { db } from "./firebase";
+import { ref, onValue } from "firebase/database";
+import { db, auth } from "./firebase";
 
 export type StationConfig = {
   latitude: number;
@@ -30,6 +30,42 @@ export function useStationConfig(): StationConfig | null {
   return config;
 }
 
+export type PipelineStatus = {
+  state: "idle" | "training" | "running" | "no_sensor_data" | "error";
+  updated_at?: string;
+  place?: string;
+};
+
+export function usePipelineStatus(): PipelineStatus | null {
+  const [status, setStatus] = useState<PipelineStatus | null>(null);
+
+  useEffect(() => {
+    const statusRef = ref(db, "station/status");
+    const unsub = onValue(statusRef, (snap) => {
+      setStatus(snap.val() ?? null);
+    });
+    return () => unsub();
+  }, []);
+
+  return status;
+}
+
 export async function updateStationConfig(cfg: StationConfig): Promise<void> {
-  await fbSet(ref(db, "station/config"), cfg);
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  const token = await user.getIdToken();
+
+  const res = await fetch("/api/station-config", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(cfg),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error ?? `Save failed (${res.status})`);
+  }
 }
