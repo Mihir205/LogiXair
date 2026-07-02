@@ -2,6 +2,7 @@
 
 import useAnalyticsData from "../../../lib/useAnalyticsData";
 import useLiveReadings from "../../../lib/useLiveReadings";
+import useHourlyTrend from "../../../lib/useHourlyTrend";
 import useWeatherData from "../../../lib/useWeatherData";
 import DashboardLayout from "../../components/DashboardLayout";
 import { useTheme } from "next-themes";
@@ -52,9 +53,11 @@ const COLORS = ["#4f46e5", "#cbd5e1", "#f59e0b", "#ef4444"];
 
 export default function AnalyticsPage() {
   const analytics = useAnalyticsData();
-  const liveReadings = useLiveReadings(48);
+  const liveReadings = useLiveReadings(96);   // 20-min nested store
+  const hourlyReadings = useHourlyTrend(168); // hourly nested store
   const liveNow = useWeatherData();
   const [trendKey, setTrendKey] = useState<(typeof TREND_PARAMS)[number]["key"]>("temperature");
+  const [resolution, setResolution] = useState<"hourly" | "20min">("hourly");
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { role, loading } = useUserRole();
@@ -88,21 +91,13 @@ export default function AnalyticsPage() {
     );
   }
 
-  // Hourly trend: prefer the pipeline's live_readings buckets (all 7
-  // parameters, real Bresser data); fall back to the legacy analytics
-  // hourly node (temp/humidity/pressure only) when history is still thin.
-  const legacyHourly = Object.entries(analytics.hourly || {}).map(([hour, value]: any) => ({
-    hour: `${hour}:00`,
-    temperature: value.avg_temperature,
-    humidity: value.avg_humidity,
-    pressure: value.avg_pressure,
-  }));
-
-  const legacySupports = ["temperature", "humidity", "pressure"].includes(trendKey);
-  const useLive = liveReadings.length > 1 || !legacySupports;
-  const hourlyData = useLive
-    ? liveReadings.map((r) => ({ hour: r.label, value: r[trendKey] ?? null }))
-    : legacyHourly.map((r: any) => ({ hour: r.hour, value: r[trendKey] ?? null }));
+  // Trend source follows the resolution toggle: hourly_trend (1 point/hour)
+  // or sensor_history (1 point/20-min). Falls back to the other if the chosen
+  // one is still empty so the chart is never blank right after a fresh start.
+  const hourlySrc = hourlyReadings.length ? hourlyReadings : liveReadings;
+  const twentySrc = liveReadings.length ? liveReadings : hourlyReadings;
+  const trendSrc = resolution === "hourly" ? hourlySrc : twentySrc;
+  const hourlyData = trendSrc.map((r) => ({ hour: r.label, value: (r as any)[trendKey] ?? null }));
 
   const rainfallData = [
     {
@@ -198,15 +193,31 @@ export default function AnalyticsPage() {
               <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                    Hourly {trendParam.label} Trend
+                    {resolution === "hourly" ? "Hourly" : "20-Minute"} {trendParam.label} Trend
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {useLive
-                      ? "Live hourly readings from the Bresser station."
-                      : "Legacy hourly averages — live buckets will take over as they accumulate."}
+                    {resolution === "hourly"
+                      ? "One aggregated reading per hour from the Bresser station."
+                      : "Aggregated reading every 20 minutes from the Bresser station."}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* resolution toggle */}
+                  <div className="flex rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden mr-1">
+                    {(["hourly", "20min"] as const).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setResolution(r)}
+                        className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                          resolution === r
+                            ? "bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900"
+                            : "bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400"
+                        }`}
+                      >
+                        {r === "hourly" ? "Hourly" : "20-min"}
+                      </button>
+                    ))}
+                  </div>
                   {TREND_PARAMS.map((p) => (
                     <button
                       key={p.key}
