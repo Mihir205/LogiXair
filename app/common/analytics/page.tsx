@@ -1,12 +1,24 @@
 "use client";
 
 import useAnalyticsData from "../../../lib/useAnalyticsData";
+import useLiveReadings from "../../../lib/useLiveReadings";
+import useWeatherData from "../../../lib/useWeatherData";
 import DashboardLayout from "../../components/DashboardLayout";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import AuthGuard from "../../components/AuthGuard";
 import RouteGuard from "../../components/RouteGuard";
 import useUserRole from "../../../lib/useUserRole";
+
+const TREND_PARAMS = [
+  { key: "temperature",    label: "Temperature",    unit: "°C",   color: "#4f46e5" },
+  { key: "humidity",       label: "Humidity",       unit: "%",    color: "#0891b2" },
+  { key: "pressure",       label: "Pressure",       unit: "hPa",  color: "#7c3aed" },
+  { key: "wind_speed",     label: "Wind Speed",     unit: "m/s",  color: "#059669" },
+  { key: "wind_direction", label: "Wind Direction", unit: "°",    color: "#d97706" },
+  { key: "rainfall",       label: "Rainfall",       unit: "mm",   color: "#2563eb" },
+  { key: "irradiance",     label: "Irradiance",     unit: "W/m²", color: "#ea580c" },
+] as const;
 
 import {
   ResponsiveContainer,
@@ -40,9 +52,14 @@ const COLORS = ["#4f46e5", "#cbd5e1", "#f59e0b", "#ef4444"];
 
 export default function AnalyticsPage() {
   const analytics = useAnalyticsData();
+  const liveReadings = useLiveReadings(48);
+  const liveNow = useWeatherData();
+  const [trendKey, setTrendKey] = useState<(typeof TREND_PARAMS)[number]["key"]>("temperature");
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { role, loading } = useUserRole();
+
+  const trendParam = TREND_PARAMS.find((p) => p.key === trendKey)!;
 
   // Avoid chart text hydration flickering across server configurations
   useEffect(() => {
@@ -71,13 +88,21 @@ export default function AnalyticsPage() {
     );
   }
 
-  // Pure data parsing configurations - 100% intact
-  const hourlyData = Object.entries(analytics.hourly || {}).map(([hour, value]: any) => ({
+  // Hourly trend: prefer the pipeline's live_readings buckets (all 7
+  // parameters, real Bresser data); fall back to the legacy analytics
+  // hourly node (temp/humidity/pressure only) when history is still thin.
+  const legacyHourly = Object.entries(analytics.hourly || {}).map(([hour, value]: any) => ({
     hour: `${hour}:00`,
     temperature: value.avg_temperature,
     humidity: value.avg_humidity,
     pressure: value.avg_pressure,
   }));
+
+  const legacySupports = ["temperature", "humidity", "pressure"].includes(trendKey);
+  const useLive = liveReadings.length > 1 || !legacySupports;
+  const hourlyData = useLive
+    ? liveReadings.map((r) => ({ hour: r.label, value: r[trendKey] ?? null }))
+    : legacyHourly.map((r: any) => ({ hour: r.hour, value: r[trendKey] ?? null }));
 
   const rainfallData = [
     {
@@ -104,22 +129,15 @@ export default function AnalyticsPage() {
       value: analytics.daily?.avg_pressure || 0,
     },
   ];
+  // Actual = live Bresser payload; Predicted = SmartWeatherAI next-hour
+  // forecast (prediction/next_hour, written every cycle by the pipeline).
+  const nextHour = analytics.prediction?.next_hour ?? analytics.prediction?.next20min ?? {};
   const predictionData = [
-    {
-      metric: "Temperature",
-      actual: analytics.weather_station?.payload?.temperature || 0,
-      predicted: analytics.prediction?.next20min?.temperature || 0,
-    },
-    {
-      metric: "Humidity",
-      actual: analytics.weather_station?.payload?.humidity || 0,
-      predicted: analytics.prediction?.next20min?.humidity || 0,
-    },
-    {
-      metric: "Pressure",
-      actual: analytics.weather_station?.payload?.pressure || 0,
-      predicted: analytics.prediction?.next20min?.pressure || 0,
-    },
+    { metric: "Temp °C",    actual: liveNow?.temperature ?? 0, predicted: nextHour.temperature ?? 0 },
+    { metric: "Humidity %", actual: liveNow?.humidity ?? 0,    predicted: nextHour.humidity ?? 0 },
+    { metric: "Wind m/s",   actual: liveNow?.wind_speed ?? 0,  predicted: nextHour.wind_speed ?? 0 },
+    { metric: "Rain mm",    actual: liveNow?.rain ?? 0,        predicted: nextHour.rainfall ?? 0 },
+    { metric: "Irrad W/m²", actual: liveNow?.irradiance ?? 0,  predicted: nextHour.irradiance ?? 0 },
   ];
 
   // Dynamic colors for internal Recharts engines
@@ -177,31 +195,63 @@ export default function AnalyticsPage() {
 
             {/* LANDSCAPE TIMELINE GRAPH */}
             <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5">
-                <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                  Hourly Temperature Trend
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Linear time-series calculation values over a 24-hour cycle.</p>
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                    Hourly {trendParam.label} Trend
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {useLive
+                      ? "Live hourly readings from the Bresser station."
+                      : "Legacy hourly averages — live buckets will take over as they accumulate."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {TREND_PARAMS.map((p) => (
+                    <button
+                      key={p.key}
+                      onClick={() => setTrendKey(p.key)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
+                        trendKey === p.key
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}`, color: mounted && theme === 'dark' ? '#f8fafc' : '#0f172a' }} />
-                    <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="temperature"
-                      stroke="#4f46e5"
-                      strokeWidth={2.5}
-                      dot={{ r: 0 }}
-                      activeDot={{ r: 4, stroke: '#4f46e5', strokeWidth: 1, fill: '#ffffff' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {hourlyData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-sm text-slate-400">
+                    No hourly {trendParam.label.toLowerCase()} history yet — the pipeline logs one reading per hour.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={hourlyData} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                      <XAxis dataKey="hour" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} unit={trendParam.unit === "°C" ? "°" : ""} />
+                      <Tooltip
+                        formatter={(v: any) => [`${Number(v).toFixed(2)} ${trendParam.unit}`, trendParam.label]}
+                        contentStyle={{ fontSize: '11px', borderRadius: '8px', background: tooltipBg, border: `1px solid ${tooltipBorder}`, color: mounted && theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                      />
+                      <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        name={trendParam.label}
+                        stroke={trendParam.color}
+                        strokeWidth={2.5}
+                        dot={{ r: 0 }}
+                        activeDot={{ r: 4, stroke: trendParam.color, strokeWidth: 1, fill: '#ffffff' }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
@@ -274,7 +324,7 @@ export default function AnalyticsPage() {
                   Actual vs Predicted Weather
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  ML forecast for the next 20 minutes compared with current conditions.
+                  SmartWeatherAI next-hour forecast compared with the live Bresser reading.
                 </p>
               </div>
 

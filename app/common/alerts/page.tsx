@@ -1,6 +1,6 @@
 "use client";
 
-import useAlerts from "../../../lib/useAlerts";
+import useLiveAlerts from "../../../lib/useLiveAlerts";
 import DashboardLayout from "../../components/DashboardLayout";
 import useUserRole from "../../../lib/useUserRole";
 import AuthGuard from "../../components/AuthGuard";
@@ -15,16 +15,10 @@ import {
 
 export default function AlertsPage() {
   const { role, loading } = useUserRole();
-  const alerts = useAlerts();
+  const { alerts, activeCount } = useLiveAlerts();
 
-  // Pure list logic mappings - 100% intact
-  const activeAlerts = alerts
-    ? Object.entries(alerts).filter(
-      ([_, alert]: any) => alert.status
-    )
-    : [];
-
-  const activeCount = activeAlerts.length;
+  // Same [key, alert] tuple shape the rendering below expects
+  const activeAlerts: [string, any][] = alerts.map((a) => [a.id, a]);
 
   if (loading || !role) {
     return (
