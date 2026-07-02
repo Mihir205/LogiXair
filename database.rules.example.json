@@ -3,25 +3,13 @@
     ".read": false,
     ".write": false,
 
-    "weather_station": {
-      ".read": "auth != null",
-      ".write": false
-    },
-
-    "analytics": {
-      ".read": "auth != null",
-      ".write": false
-    },
+    "weather_station":        { ".read": "auth != null", ".write": false },
+    "analytics":              { ".read": "auth != null", ".write": false },
+    "alerts":                 { ".read": "auth != null", ".write": false },
 
     "station": {
-      "config": {
-        ".read": "auth != null",
-        ".write": false
-      },
-      "status": {
-        ".read": "auth != null",
-        ".write": false
-      }
+      "config": { ".read": "auth != null", ".write": false },
+      "status": { ".read": "auth != null", ".write": false }
     },
 
     "model_metrics":          { ".read": "auth != null", ".write": false },
@@ -30,13 +18,6 @@
     "validation_history":     { ".read": "auth != null", ".write": false },
     "prediction":             { ".read": "auth != null", ".write": false },
     "prediction_history":     { ".read": "auth != null", ".write": false },
-    "validation":             { ".read": "auth != null", ".write": false },
-
-    "roles": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": false
-      }
-    }
+    "validation":             { ".read": "auth != null", ".write": false }
   }
 }
