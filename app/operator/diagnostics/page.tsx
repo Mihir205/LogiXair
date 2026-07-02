@@ -2,51 +2,113 @@
 import RouteGuard from "../../components/RouteGuard";
 import AuthGuard from "../../components/AuthGuard";
 import DashboardLayout from "../../components/DashboardLayout";
-import { Cpu, CheckCircle2, BarChart2 } from "lucide-react";
+import useWeatherData from "../../../lib/useWeatherData";
+import useDeviceHealth from "../../../lib/useDeviceHealth";
+import { Cpu, CheckCircle2, XCircle, BarChart2, Wifi, Battery, Clock } from "lucide-react";
+
+const SENSORS: { key: string; label: string; bus: string }[] = [
+  { key: "temperature", label: "Temperature", bus: "Bresser 5-in-1" },
+  { key: "humidity", label: "Humidity", bus: "Bresser 5-in-1" },
+  { key: "wind_speed", label: "Wind Speed", bus: "Bresser anemometer" },
+  { key: "wind_direction", label: "Wind Direction", bus: "Bresser vane" },
+  { key: "rain", label: "Rainfall", bus: "Bresser gauge" },
+  { key: "pressure", label: "Pressure", bus: "BMP280 (I²C)" },
+  { key: "irradiance", label: "Irradiance", bus: "Solar sensor" },
+];
+
+function ago(sec: number | null): string {
+  if (sec == null) return "never";
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
+}
+// RSSI (-120..-40 dBm) → 0..100%
+const rssiPct = (dbm: number | null) =>
+  dbm == null ? 0 : Math.max(0, Math.min(100, Math.round(((dbm + 120) / 80) * 100)));
 
 export default function DiagnosticsPage() {
+  const w = useWeatherData();
+  const health = useDeviceHealth();
+
+  const onlinePct = health?.lastSeenSec != null ? Math.max(0, 100 - Math.round((health.lastSeenSec / (20 * 60)) * 100)) : 0;
+
   return (
     <AuthGuard>
       <RouteGuard allowedRole="operator">
         <DashboardLayout role="operator">
-          <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-600/10 selection:text-indigo-700 transition-colors duration-200">
-            
-            {/* CLASSIC B2B HEADER BLOCK */}
+          <div className="space-y-6 max-w-[1400px] mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased transition-colors duration-200">
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Diagnostics
-                </h1>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Diagnostics</h1>
                 <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-                  Live calculation matrix, embedded memory mapping, and structural hardware parameters.
+                  Live link telemetry, power, and per-sensor bus verification.
                 </p>
               </div>
-              
-              <div className="inline-flex items-center self-start md:self-auto gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors duration-200">
-                <Cpu size={14} className="text-indigo-600 dark:text-indigo-400" />
-                <span className="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300">Core Engine Nominal</span>
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm ${
+                health?.online ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/60" : "bg-rose-50 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/60"
+              }`}>
+                <Cpu size={14} className={health?.online ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} />
+                <span className="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300">
+                  {health == null ? "Awaiting telemetry…" : health.online ? "Core Engine Nominal" : "Node Offline"}
+                </span>
               </div>
             </div>
 
-            {/* DIAGNOSTICS CONTAINER MODULE */}
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm flex flex-col justify-between transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-800">
-              <div>
-                <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Computational Status</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Microcontroller runtime telemetry metrics.</p>
+            {health == null ? (
+              <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                Waiting for the first telemetry packet…
+              </div>
+            ) : (
+              <>
+                {/* LINK / POWER */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm">
+                  <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Runtime Telemetry</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Signal, power, and data freshness.</p>
+                    </div>
+                    <BarChart2 size={15} className="text-slate-400 dark:text-slate-500" />
                   </div>
-                  <BarChart2 size={15} className="text-slate-400 dark:text-slate-500" />
+                  <div className="space-y-1.5">
+                    <MetricRow icon={<Wifi size={14} className="text-slate-500" />} label={`Signal Strength : ${health.signal.label}`} details={health.signal.dbm != null ? `${health.signal.dbm} dBm` : "no RSSI"} value={`${rssiPct(health.signal.dbm)}%`} pct={rssiPct(health.signal.dbm)} />
+                    <MetricRow icon={<Battery size={14} className="text-slate-500" />} label={`Battery : ${health.battery.label}`} details="Node power reserve" value={health.battery.label} status={health.battery.level} />
+                    <MetricRow icon={<Clock size={14} className="text-slate-500" />} label={`Data Freshness : ${ago(health.lastSeenSec)}`} details="Time since last packet" value={`${onlinePct}%`} pct={onlinePct} />
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <DiagnosticMetricRow label="CPU Usage : 34%" details="Core compute workload context" value="34%" loadPercent={34} />
-                  <DiagnosticMetricRow label="Memory Usage : 40%" details="Dynamic static RAM resource mapping" value="40%" loadPercent={40} />
-                  <DiagnosticMetricRow label="Sensor Status : OK" details="Peripheral I2C hardware bus verification" value="OK" isStatus={true} />
+                {/* SENSOR BUS */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm">
+                  <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Sensor Bus Verification</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Each peripheral reporting a valid reading in the latest packet.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {SENSORS.map((s) => {
+                      const v = (w as any)?.[s.key];
+                      const ok = typeof v === "number" && Number.isFinite(v);
+                      return (
+                        <div key={s.key} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 dark:border-slate-800/60 bg-slate-50/40 dark:bg-slate-950/40 p-3">
+                          <div className="flex items-center gap-2">
+                            {ok ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> : <XCircle size={14} className="text-rose-500 shrink-0" />}
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-none">{s.label}</p>
+                              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{s.bus}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                            ok ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40"
+                               : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-900/40"
+                          }`}>
+                            {ok ? (typeof v === "number" ? v.toFixed(1) : "OK") : "No data"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            </div>
-
+              </>
+            )}
           </div>
         </DashboardLayout>
       </RouteGuard>
@@ -54,32 +116,28 @@ export default function DiagnosticsPage() {
   );
 }
 
-/* ---------- Simplified B2B Sub-components with Theme Adapters ---------- */
-
-function DiagnosticMetricRow({ label, details, value, loadPercent, isStatus }: any) {
+function MetricRow({ icon, label, details, value, pct, status }: any) {
+  const statusColor: Record<string, string> = {
+    good: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40",
+    warn: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40",
+    bad: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-900/40",
+    unknown: "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-slate-700/60",
+  };
   return (
-    <div className="bg-slate-50/40 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-slate-100 dark:border-slate-800/40 transition-colors duration-150">
+    <div className="bg-slate-50/40 dark:bg-slate-950/40 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-slate-100 dark:border-slate-800/40">
       <div className="space-y-1 flex-1">
         <div className="flex items-center gap-2">
-          {!isStatus && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />}
-          {isStatus && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
+          {icon}
           <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">{label}</h4>
         </div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-3.5 sm:pl-0">{details}</p>
-        
-        {/* Modern micro progress indicator line for resource loads */}
-        {loadPercent && (
-          <div className="w-full max-w-xs h-1 bg-slate-200/60 dark:bg-slate-800/60 rounded-full overflow-hidden mt-2 ml-3.5 sm:ml-0">
-            <div className="bg-indigo-600 dark:bg-indigo-400 h-full transition-all duration-300" style={{ width: `${loadPercent}%` }} />
+        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-6">{details}</p>
+        {typeof pct === "number" && (
+          <div className="w-full max-w-xs h-1 bg-slate-200/60 dark:bg-slate-800/60 rounded-full overflow-hidden mt-2 ml-6">
+            <div className={`h-full transition-all duration-300 ${pct < 30 ? "bg-rose-500" : pct < 60 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${pct}%` }} />
           </div>
         )}
       </div>
-      
-      <span className={`text-xs font-bold px-2.5 py-1 rounded border tracking-wide transition-colors duration-200 ${
-        isStatus 
-          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40" 
-          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-slate-700/60 shadow-sm"
-      }`}>
+      <span className={`text-xs font-bold px-2.5 py-1 rounded border tracking-wide ${status ? statusColor[status] : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-slate-700/60 shadow-sm"}`}>
         {value}
       </span>
     </div>
