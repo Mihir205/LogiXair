@@ -148,9 +148,10 @@ export async function POST(req: Request) {
     // ── 1. Read raw body once, use for both signature check and JSON parse ─
     const rawBody = await req.text();
     const providedSig = req.headers.get("x-emqx-signature");
+    const providedToken = req.headers.get("x-webhook-token");
 
-    // ── 2. Signature guard ──────────────────────────────────────────
-    const sigDecision = checkWebhookSignature(rawBody, providedSig);
+    // ── 2. Signature guard (HMAC or static token) ───────────────────
+    const sigDecision = checkWebhookSignature(rawBody, providedSig, providedToken);
     if (!sigDecision.accepted) {
         try {
             await logSecurityEvent({

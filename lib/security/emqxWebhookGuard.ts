@@ -16,13 +16,17 @@
  */
 import crypto from "crypto";
 
-// FLIP FOR BEFORE/AFTER webhook-spoofing screenshots.
-// Temporarily false while we sort out the EMQX rule-engine HMAC function
-// name on Cloud Serverless. Flip back to true once the SQL `... as sig`
-// column works in the SQL Tester.
-export const WEBHOOK_GUARD_ENABLED = false;
+// EMQX Cloud Serverless cannot compute HMAC in its rule engine, so the
+// guard accepts EITHER of two proofs:
+//   1. x-emqx-signature: sha256=<hmac-hex>   (full HMAC, self-hosted EMQX)
+//   2. x-webhook-token: <shared secret>      (static header — Serverless CAN
+//                                             attach custom headers to the
+//                                             webhook action)
+// Both compare against EMQX_WEBHOOK_SECRET with timing-safe equality.
+export const WEBHOOK_GUARD_ENABLED = true;
 
 const HEADER_NAME = "x-emqx-signature";
+const TOKEN_HEADER_NAME = "x-webhook-token";
 const SIG_PREFIX = "sha256=";
 
 export type WebhookDecision =
@@ -47,6 +51,7 @@ export type WebhookDecision =
 export function checkWebhookSignature(
     rawBody: string,
     providedSignature: string | null,
+    providedToken: string | null = null,
 ): WebhookDecision {
     if (!WEBHOOK_GUARD_ENABLED) {
         return { accepted: true, reason: "guard_disabled" };
@@ -63,11 +68,28 @@ export function checkWebhookSignature(
         };
     }
 
+    // Path 2: static shared-token header (EMQX Cloud Serverless).
+    if (!providedSignature && providedToken) {
+        const tokBuf = Buffer.from(providedToken, "utf8");
+        const secBuf = Buffer.from(secret, "utf8");
+        if (
+            tokBuf.length === secBuf.length &&
+            crypto.timingSafeEqual(tokBuf, secBuf)
+        ) {
+            return { accepted: true, reason: "ok" };
+        }
+        return {
+            accepted: false,
+            reason: "signature_mismatch",
+            detail: `${TOKEN_HEADER_NAME} does not match EMQX_WEBHOOK_SECRET.`,
+        };
+    }
+
     if (!providedSignature) {
         return {
             accepted: false,
             reason: "no_signature_header",
-            detail: `Missing ${HEADER_NAME} header.`,
+            detail: `Missing ${HEADER_NAME} (HMAC) or ${TOKEN_HEADER_NAME} (static token) header.`,
         };
     }
 
