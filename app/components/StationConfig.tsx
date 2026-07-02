@@ -148,9 +148,17 @@ export default function StationConfig() {
     }
   };
 
+  // Enabled when coords are valid numbers AND differ from the saved config.
+  // If we can't read the saved config at all (null), allow saving — the
+  // server-side route still validates everything.
+  const coordsValid =
+    lat.trim() !== "" && lon.trim() !== "" &&
+    !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lon));
+
   const dirty =
-    current &&
-    (Number(lat).toFixed(4) !== current.latitude.toFixed(4) ||
+    coordsValid &&
+    (!current ||
+      Number(lat).toFixed(4) !== current.latitude.toFixed(4) ||
       Number(lon).toFixed(4) !== current.longitude.toFixed(4) ||
       place !== current.place);
 
