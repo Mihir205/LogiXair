@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // ── users ───────────────────────────────────────────────────────
+    // get: owner or admin only (closes email/role enumeration).
+    // list: admin only (closes bulk email harvest).
+    // update: owner may edit own doc but NOT change role; admins full.
+    match /users/{uid} {
+      allow get:    if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow list:   if isAdmin();
+      allow update: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── security_events ─────────────────────────────────────────────
+    // Admin read; writes only via admin SDK (bypasses rules).
+    match /security_events/{evt} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+    // ── loginAttempts (brute-force lockout counters) ────────────────
+    // recordFailure() runs on a FAILED login = UNAUTHENTICATED, and reads
+    // the current counter before writing, so this one collection must stay
+    // publicly read/write. It holds only per-identifier attempt counters.
+    // Hardening path: move lockout server-side (admin SDK) to lock this down.
+    match /loginAttempts/{id} {
+      allow read, write: if true;
+    }
+
+    // ── LoRa attack audit logs (written by admin SDK, read by dashboard) ─
+    match /loraReplayAttempts/{id}    { allow read: if isSignedIn(); allow write: if false; }
+    match /loraInjectionAttempts/{id} { allow read: if isSignedIn(); allow write: if false; }
+
+    // ── stations registry ───────────────────────────────────────────
+    match /stations/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── default deny (replaces the previous world-open catch-all) ────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
