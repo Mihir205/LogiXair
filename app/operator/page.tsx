@@ -3,6 +3,7 @@ import RouteGuard from "../components/RouteGuard";
 import AuthGuard from "../components/AuthGuard";
 import DashboardLayout from "../components/DashboardLayout";
 import ModelCharts from "../components/ModelCharts";
+import StationConfig from "../components/StationConfig";
 import useWeatherData from "../../lib/useWeatherData";
 import {
   Activity,
@@ -173,6 +174,11 @@ export default function OperatorPage() {
 
               </div>
 
+            </div>
+
+            {/* STATION CONFIG — set training location */}
+            <div className="pt-2">
+              <StationConfig />
             </div>
 
             {/* ML MODEL ANALYTICS */}
