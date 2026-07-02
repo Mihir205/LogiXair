@@ -25,6 +25,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
+import useDeviceHealth from "@/lib/useDeviceHealth";
 import {
   XSS_DEMO_VULNERABLE,
   validateStationName,
@@ -40,6 +41,7 @@ type Station = {
 export default function StationsPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [openModal, setOpenModal] = useState(false);
+  const health = useDeviceHealth();
 
   const [stationName, setStationName] = useState("");
   const [location, setLocation] = useState("");
@@ -154,6 +156,31 @@ export default function StationsPage() {
                 <Plus size={14} />
                 Add Station
               </button>
+            </div>
+
+            {/* LIVE TELEMETRY NODE — real status of the transmitting station */}
+            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-2.5 w-2.5">
+                    {health?.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${health?.online ? "bg-emerald-500" : "bg-rose-500"}`} />
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live Telemetry Node</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      {health == null ? "Awaiting telemetry…" : `${health.stationId} — ${health.online ? "Online" : "Offline"}`}
+                    </h3>
+                  </div>
+                </div>
+                {health && (
+                  <div className="hidden sm:flex items-center gap-5 text-xs">
+                    <LiveStat label="Battery" value={health.battery.label} />
+                    <LiveStat label="Signal" value={health.signal.label} />
+                    <LiveStat label="Last packet" value={health.lastSeenSec != null ? (health.lastSeenSec < 60 ? `${health.lastSeenSec}s ago` : `${Math.floor(health.lastSeenSec / 60)}m ago`) : "—"} />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* STATION LIST OVERVIEW PANEL */}
@@ -275,6 +302,15 @@ export default function StationsPage() {
 }
 
 /* ---------- Simplified B2B Sub-components with Theme Adapters ---------- */
+
+function LiveStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-right">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{value}</p>
+    </div>
+  );
+}
 
 function StationListItem({
   identity,
