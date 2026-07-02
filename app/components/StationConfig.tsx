@@ -34,18 +34,20 @@ export default function StationConfig() {
     setStatus("searching");
     setError("");
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place)}&format=json&limit=1`
-      );
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(place.trim())}`);
       const data = await res.json();
-      if (!data.length) {
-        setError("Location not found. Try a more specific place name.");
+      if (!res.ok) {
+        setError(
+          res.status === 404
+            ? "Location not found. Try a more specific place name."
+            : data?.error ?? "Geocoding failed."
+        );
         setStatus("error");
         return;
       }
-      setLat(Number(data[0].lat).toFixed(4));
-      setLon(Number(data[0].lon).toFixed(4));
-      setPlace(data[0].display_name.split(",").slice(0, 2).join(","));
+      setLat(data.latitude.toFixed(4));
+      setLon(data.longitude.toFixed(4));
+      setPlace(data.name);
       setStatus("idle");
     } catch {
       setError("Geocoding failed. Check your connection.");
@@ -68,16 +70,12 @@ export default function StationConfig() {
       return;
 
     setStatus("searching");
+    setError("");
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${nlat}&lon=${nlon}&format=json&zoom=10`
-      );
+      const res = await fetch(`/api/geocode?lat=${nlat}&lon=${nlon}`);
       const data = await res.json();
-      if (data?.display_name) {
-        setPlace(data.display_name.split(",").slice(0, 2).join(","));
-      } else {
-        // Open ocean / unnamed area — still perfectly valid for NASA POWER
-        setPlace(`Unnamed area (${nlat.toFixed(2)}°, ${nlon.toFixed(2)}°)`);
+      if (res.ok && data?.name) {
+        setPlace(data.name);
       }
       setStatus("idle");
     } catch {
@@ -99,10 +97,10 @@ export default function StationConfig() {
         setLon(pos.coords.longitude.toFixed(4));
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`
+            `/api/geocode?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
           );
           const data = await res.json();
-          setPlace(data?.display_name?.split(",").slice(0, 2).join(",") ?? "");
+          if (res.ok && data?.name) setPlace(data.name);
         } catch {}
         setStatus("idle");
       },
@@ -133,12 +131,12 @@ export default function StationConfig() {
       let placeName = place.trim();
       if (!placeName) {
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${nlat}&lon=${nlon}&format=json&zoom=10`
-          );
+          const res = await fetch(`/api/geocode?lat=${nlat}&lon=${nlon}`);
           const data = await res.json();
-          placeName = data?.display_name?.split(",").slice(0, 2).join(",") ?? "";
-          if (placeName) setPlace(placeName);
+          if (res.ok && data?.name) {
+            placeName = data.name;
+            setPlace(placeName);
+          }
         } catch {}
       }
       await updateStationConfig({ latitude: nlat, longitude: nlon, place: placeName || `${nlat.toFixed(4)},${nlon.toFixed(4)}` });
