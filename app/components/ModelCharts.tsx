@@ -105,22 +105,30 @@ export default function ModelCharts() {
   const activeMetric = activeModel ? metrics?.models[activeModel] : undefined;
 
   const timeSeriesData = useMemo(
-    () =>
-      history.map((entry) => {
-        // entry.hour is "YYYY-MM-DD HH:MM" — show the real clock time (HH:MM),
-        // not the minute slice. Falls back to the raw value if unexpected.
-        const clock = entry.hour.split(/[ T]/)[1] ?? entry.hour;
-        const point: Record<string, any> = {
-          time: clock,
-          hour: entry.hour,
-          _entry: entry,
-          actual: entry.actual?.[sensorKey] ?? null,
-        };
-        for (const name of modelNames) {
-          point[name] = entry.predictions?.[name]?.[sensorKey] ?? null;
-        }
-        return point;
-      }),
+    () => {
+      // Collapse the 20-min validation ledger to one point per clock hour so the
+      // chart reads hourly. entry.hour is "YYYY-MM-DD HH:MM"; bucket on the
+      // "YYYY-MM-DD HH" prefix and keep the latest reading in each hour (history
+      // is time-ordered), so the current hour stays live and updates in place.
+      const byHour = new Map<string, ValidationEntry>();
+      for (const entry of history) {
+        byHour.set(entry.hour.slice(0, 13), entry);
+      }
+      return [...byHour.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([bucket, entry]) => {
+          const point: Record<string, any> = {
+            time: `${bucket.slice(11, 13)}:00`, // "HH:00"
+            hour: entry.hour,
+            _entry: entry,
+            actual: entry.actual?.[sensorKey] ?? null,
+          };
+          for (const name of modelNames) {
+            point[name] = entry.predictions?.[name]?.[sensorKey] ?? null;
+          }
+          return point;
+        });
+    },
     [history, sensorKey, modelNames]
   );
 
@@ -321,7 +329,7 @@ export default function ModelCharts() {
       <ChapterCard
         chapter="03"
         title="The live ledger"
-        subtitle={`Actual vs predicted ${sensor.label.toLowerCase()}, every 20 minutes, from the Bresser feed.`}
+        subtitle={`Actual vs predicted ${sensor.label.toLowerCase()}, every hour, from the Bresser feed.`}
         insight={insightForTimeSeries(drift, timeSeriesData.length, sensor)}
         headerAside={
           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -354,7 +362,7 @@ export default function ModelCharts() {
             <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400">
               <TrendingUp size={28} className="text-slate-300 dark:text-slate-700" />
               <p className="font-editorial italic text-sm">The ledger hasn't opened yet.</p>
-              <p className="text-xs">First actual-vs-predicted record lands ~20 min after the pipeline starts running.</p>
+              <p className="text-xs">First actual-vs-predicted record lands within the hour after the pipeline starts running.</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">

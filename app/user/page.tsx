@@ -12,7 +12,6 @@ import {
   Gauge,
   Sun,
   CheckCircle2,
-  AlertTriangle,
   Wind,
   Compass,
   Battery,
@@ -186,29 +185,8 @@ export default function UserPage() {
             {/* LOWER SPLIT GRID LAYOUT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-              {/* HARDWARE DIAGNOSTICS TABLE */}
-              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm flex flex-col justify-between transition-colors duration-200">
-                <div>
-                  <div className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
-                    <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                      Station Hardware Diagnostics
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Physical node status reports.</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <DiagnosticRow label="Core Microcontroller" status="Optimal" isNormal={true} />
-                    <DiagnosticRow label="Barometric Sensor Array" status="Optimal" isNormal={true} />
-                    <DiagnosticRow label="Thermal Core Coupling" status="Optimal" isNormal={true} />
-                    <DiagnosticRow label="Photoresistor Diode" status="Optimal" isNormal={true} />
-                    <DiagnosticRow label="Precipitation Switch" status="Optimal" isNormal={true} />
-                    <DiagnosticRow label="Backup Battery Cell" status="94% Capacity" isNormal={true} />
-                  </div>
-                </div>
-              </div>
-
               {/* GEOGRAPHIC MAP FRAME */}
-              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm flex flex-col transition-colors duration-200">
+              <div className="lg:col-span-12 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 p-6 shadow-sm flex flex-col transition-colors duration-200">
                 <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
                   <MapPinned size={16} className="text-indigo-600 dark:text-indigo-400" />
                   <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
@@ -262,27 +240,6 @@ function MetricCard({ title, value, icon }: any) {
       <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mt-4 whitespace-nowrap">
         {value}
       </h3>
-    </div>
-  );
-}
-
-// Fixed DiagnosticRow targeting specific deep border structures smoothly
-function DiagnosticRow({ label, status, isNormal }: any) {
-  return (
-    <div className="bg-slate-50/40 dark:bg-slate-950/40 rounded-lg px-4 py-3 flex justify-between items-center border border-slate-100 dark:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150">
-      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-        {label}
-      </span>
-      <div className="flex items-center gap-1.5">
-        {isNormal ? (
-          <CheckCircle2 size={13} className="text-emerald-500" />
-        ) : (
-          <AlertTriangle size={13} className="text-amber-500" />
-        )}
-        <span className={`text-xs font-bold ${isNormal ? "text-slate-700 dark:text-slate-200" : "text-amber-600"}`}>
-          {status}
-        </span>
-      </div>
     </div>
   );
 }
