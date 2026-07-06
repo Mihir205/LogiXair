@@ -3,6 +3,7 @@ import RouteGuard from "../components/RouteGuard";
 import AuthGuard from "../components/AuthGuard";
 import DashboardLayout from "../components/DashboardLayout";
 import ModelCharts from "../components/ModelCharts";
+import DataExport from "../components/DataExport";
 import StationConfig from "../components/StationConfig";
 import useWeatherData from "../../lib/useWeatherData";
 import {
@@ -184,6 +185,11 @@ export default function OperatorPage() {
             {/* ML MODEL ANALYTICS */}
             <div className="pt-4">
               <ModelCharts />
+            </div>
+
+            {/* DATA EXPORT (CSV by place + date) */}
+            <div className="pt-4">
+              <DataExport />
             </div>
           </div>
         </DashboardLayout>
