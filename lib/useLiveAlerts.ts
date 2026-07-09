@@ -47,6 +47,18 @@ export default function useLiveAlerts(): {
     const push = (id: string, message: string, type: LiveAlert["type"]) =>
       out.push({ id, message, type, source: "threshold", timestamp: now, status: true });
 
+    // ---- Station connectivity ----
+    // When disconnected, raise ONE offline alert and skip all the weather
+    // threshold checks (their inputs are blanked, so they'd be false anyway —
+    // this also guarantees we never alert on frozen/stale values).
+    if (w.stale) {
+      const mins = typeof w.receivedAt === "number"
+        ? Math.round((now - w.receivedAt) / 60000)
+        : null;
+      push("offline", `Station disconnected — no telemetry${mins != null ? ` for ${mins} min` : ""}. Data collection paused.`, "critical");
+      return out;
+    }
+
     // ---- Hardware health ----
     if (w.battery && w.battery !== "OK") {
       push("battery", `Station battery is ${w.battery} — schedule a field visit`, "critical");
