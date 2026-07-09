@@ -40,10 +40,6 @@ export type WeatherSnapshot = {
 // 15 min without a packet ⇒ station disconnected (matches the pipeline's
 // STALE_FEED_SECONDS so dashboard and backend agree on "offline").
 export const STALE_MS = 15 * 60 * 1000;
-const SENSOR_KEYS = [
-  "temperature", "humidity", "rain", "wind_speed", "wind_max_ms",
-  "wind_avg_ms", "wind_direction", "pressure", "light", "irradiance",
-] as const;
 
 /**
  * Reads `weather_station/{payload, receivedAt, topic}` from Firebase RTDB
@@ -99,19 +95,10 @@ export default function useWeatherData(): WeatherSnapshot | null {
       ? Date.now() - raw.receivedAt > STALE_MS
       : true;
 
-  if (!stale) return { ...raw, stale: false };
-
-  // Disconnected → blank every sensor reading so no frozen value is ever
-  // shown as live. Keep identity + last-seen metadata for the health view.
-  const blanked: WeatherSnapshot = {
-    station_id: raw.station_id,
-    device_id: raw.device_id,
-    receivedAt: raw.receivedAt,
-    rssi: raw.rssi,
-    battery: raw.battery,
-    topic: raw.topic,
-    stale: true,
-  };
-  for (const k of SENSOR_KEYS) blanked[k] = undefined;
-  return blanked;
+  // Keep the LAST readings visible even when disconnected (don't blank) — just
+  // flag `stale` so the UI can mark it "offline / last reading". When the
+  // station reconnects, onValue delivers fresh data and the display updates.
+  // NOTE: this is display-only. The pipeline still stores NOTHING to Firebase
+  // while disconnected, so no stale/spoofed data is ever persisted.
+  return { ...raw, stale };
 }

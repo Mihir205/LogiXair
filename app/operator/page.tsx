@@ -61,11 +61,18 @@ export default function OperatorPage() {
 
               <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
                 <div className="space-y-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/60 uppercase tracking-wider relative">
-                    <span className="animate-ping absolute h-2 w-2 rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 dark:bg-emerald-400" />
-                    Primary Link Live
-                  </span>
+                  {w?.stale ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/60 uppercase tracking-wider">
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500 dark:bg-rose-400" />
+                      Station Offline · showing last reading
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/60 uppercase tracking-wider relative">
+                      <span className="animate-ping absolute h-2 w-2 rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 dark:bg-emerald-400" />
+                      Primary Link Live
+                    </span>
+                  )}
                   <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white pt-1">
                     ESP32 Weather Station Node
                   </h1>
@@ -81,8 +88,8 @@ export default function OperatorPage() {
               <MetricCard
                 title="Core Temperature"
                 value={fmt(w?.temperature, "°C")}
-                trend={w ? "Live Bresser feed" : "Awaiting feed"}
-                trendType={w?.temperature !== undefined ? "positive" : "neutral"}
+                trend={w?.stale ? "Offline · last reading" : w ? "Live Bresser feed" : "Awaiting feed"}
+                trendType={w?.stale ? "negative" : w?.temperature !== undefined ? "positive" : "neutral"}
                 icon={<Thermometer size={16} className="text-slate-600 dark:text-slate-400" />}
               />
               <MetricCard
